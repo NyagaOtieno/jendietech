@@ -16,4 +16,5 @@ app.use("/api/sessions", sessionRoutes);
 app.use("/api/rollcall", rollcallRoutes);
 
 // ✅ Use Railway's assigned port or fallback to 3000
-const PORT = process.env.POR
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));

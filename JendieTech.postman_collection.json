@@ -1,11 +1,99 @@
 {
   "info": {
     "name": "JENDIE Tech API",
-    "_postman_id": "b7f80e3a-2e61-4f55-9f76-123456789abc",
-    "description": "Postman collection for JENDIE Technician Workflow API (Express + Prisma + Neon)",
+    "_postman_id": "b7f80e3a-2e61-4f55-9f76-abcdef123456",
+    "description": "Postman collection for JENDIE Technician Workflow API (Express + Prisma + Neon on Railway)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"johndoe@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"TECHNICIAN\"\n}"
+            },
+            "url": "https://jendietech-production.up.railway.app/api/auth/register"
+          }
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"johndoe@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": "https://jendietech-production.up.railway.app/api/auth/login"
+          }
+        },
+        {
+          "name": "Logout User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization\", \"value\": \"Bearer <your_jwt_token>\" }
+            ],
+            "url": "https://jendietech-production.up.railway.app/api/auth/logout"
+          }
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization\", \"value\": \"Bearer <your_jwt_token>\" }
+            ],
+            "url": "https://jendietech-production.up.railway.app/api/users"
+          }
+        },
+        {
+          "name": "Get Single User",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization\", \"value\": \"Bearer <your_jwt_token>\" }
+            ],
+            "url": "https://jendietech-production.up.railway.app/api/users/2"
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization\", \"value\": \"Bearer <your_jwt_token>\" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Updated\",\n  \"role\": \"ADMIN\"\n}"
+            },
+            "url": "https://jendietech-production.up.railway.app/api/users/2"
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization\", \"value\": \"Bearer <your_jwt_token>\" }
+            ],
+            "url": "https://jendietech-production.up.railway.app/api/users/2"
+          }
+        }
+      ]
+    },
     {
       "name": "Jobs",
       "item": [
@@ -13,14 +101,7 @@
           "name": "Get All Jobs",
           "request": {
             "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3000/api/jobs",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "jobs"]
-            }
+            "url": "https://jendietech-production.up.railway.app/api/jobs"
           }
         },
         {
@@ -34,39 +115,13 @@
               "mode": "raw",
               "raw": "{\n  \"vehicleReg\": \"KAA111A\",\n  \"jobType\": \"INSTALL\",\n  \"status\": \"PENDING\",\n  \"scheduledDate\": \"2025-09-05T09:00:00Z\",\n  \"location\": \"Kisumu\",\n  \"technicianId\": 2\n}"
             },
-            "url": {
-              "raw": "http://localhost:3000/api/jobs",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "jobs"]
-            }
-          }
-        },
-        {
-          "name": "Update Job Status",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{ \"status\": \"DONE\" }"
-            },
-            "url": {
-              "raw": "http://localhost:3000/api/jobs/1/status",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "jobs", "1", "status"]
-            }
+            "url": "https://jendietech-production.up.railway.app/api/jobs"
           }
         }
       ]
     },
     {
-      "name": "Sessions (Login/Logout/Online)",
+      "name": "Sessions",
       "item": [
         {
           "name": "Login Technician",
@@ -79,13 +134,7 @@
               "mode": "raw",
               "raw": "{ \"userId\": 2 }"
             },
-            "url": {
-              "raw": "http://localhost:3000/api/sessions/login",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "sessions", "login"]
-            }
+            "url": "https://jendietech-production.up.railway.app/api/sessions/login"
           }
         },
         {
@@ -99,27 +148,14 @@
               "mode": "raw",
               "raw": "{ \"userId\": 2 }"
             },
-            "url": {
-              "raw": "http://localhost:3000/api/sessions/logout",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "sessions", "logout"]
-            }
+            "url": "https://jendietech-production.up.railway.app/api/sessions/logout"
           }
         },
         {
           "name": "Get Online Users",
           "request": {
             "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3000/api/sessions/online",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "sessions", "online"]
-            }
+            "url": "https://jendietech-production.up.railway.app/api/sessions/online"
           }
         }
       ]
@@ -128,18 +164,10 @@
       "name": "Reports",
       "item": [
         {
-          "name": "Weekly Report by Region",
+          "name": "Weekly Report (Nairobi)",
           "request": {
             "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3000/api/reports/weekly?region=Nairobi",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "reports", "weekly"],
-              "query": [{ "key": "region", "value": "Nairobi" }]
-            }
+            "url": "https://jendietech-production.up.railway.app/api/reports/weekly?region=Nairobi"
           }
         }
       ]
@@ -158,27 +186,14 @@
               "mode": "raw",
               "raw": "{ \"region\": \"Nairobi\" }"
             },
-            "url": {
-              "raw": "http://localhost:3000/api/rollcall",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "rollcall"]
-            }
+            "url": "https://jendietech-production.up.railway.app/api/rollcall"
           }
         },
         {
           "name": "Get Roll Call History",
           "request": {
             "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3000/api/rollcall",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "rollcall"]
-            }
+            "url": "https://jendietech-production.up.railway.app/api/rollcall"
           }
         }
       ]

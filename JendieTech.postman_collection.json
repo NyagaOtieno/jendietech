@@ -1,0 +1,187 @@
+{
+  "info": {
+    "name": "JENDIE Tech API",
+    "_postman_id": "b7f80e3a-2e61-4f55-9f76-123456789abc",
+    "description": "Postman collection for JENDIE Technician Workflow API (Express + Prisma + Neon)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Jobs",
+      "item": [
+        {
+          "name": "Get All Jobs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/jobs",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "jobs"]
+            }
+          }
+        },
+        {
+          "name": "Create Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicleReg\": \"KAA111A\",\n  \"jobType\": \"INSTALL\",\n  \"status\": \"PENDING\",\n  \"scheduledDate\": \"2025-09-05T09:00:00Z\",\n  \"location\": \"Kisumu\",\n  \"technicianId\": 2\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/jobs",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "jobs"]
+            }
+          }
+        },
+        {
+          "name": "Update Job Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"DONE\" }"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/jobs/1/status",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "jobs", "1", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sessions (Login/Logout/Online)",
+      "item": [
+        {
+          "name": "Login Technician",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userId\": 2 }"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/sessions/login",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "sessions", "login"]
+            }
+          }
+        },
+        {
+          "name": "Logout Technician",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userId\": 2 }"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/sessions/logout",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "sessions", "logout"]
+            }
+          }
+        },
+        {
+          "name": "Get Online Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/sessions/online",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "sessions", "online"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Weekly Report by Region",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/reports/weekly?region=Nairobi",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "reports", "weekly"],
+              "query": [{ "key": "region", "value": "Nairobi" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Roll Call",
+      "item": [
+        {
+          "name": "Take Roll Call (Nairobi)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"region\": \"Nairobi\" }"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/rollcall",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "rollcall"]
+            }
+          }
+        },
+        {
+          "name": "Get Roll Call History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/rollcall",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "rollcall"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "name": "jendietech-backend",
+  "version": "1.0.0",
+  "description": "JENDIE Technician Workflow backend with Express, Prisma, and Neon Postgres",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:generate": "prisma generate",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "node prisma/seed.js"
+  },
+  "keywords": [
+    "express",
+    "prisma",
+    "postgres",
+    "neon",
+    "backend",
+    "workflow"
+  ],
+  "author": "Kennedy",
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/client": "^6.15.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "prisma": "^6.15.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
+}

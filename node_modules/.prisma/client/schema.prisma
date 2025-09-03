@@ -23,6 +23,7 @@ enum JobType {
   INSTALL
   RENEWAL
   FAULT_CHECK
+  REPAIR
 }
 
 enum JobStatus {

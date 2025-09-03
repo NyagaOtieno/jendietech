@@ -9,7 +9,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "node prisma/seed.js"
+    "prisma:seed": "node prisma/seed.js",
+    "seed": "node prisma/seed.js"
   },
   "keywords": [
     "express",
@@ -31,8 +32,5 @@
   "devDependencies": {
     "nodemon": "^3.1.0",
     "prisma": "^6.15.0"
-  },
-  "prisma": {
-    "seed": "node prisma/seed.js"
   }
 }

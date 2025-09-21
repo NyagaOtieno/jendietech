@@ -1,100 +1,18 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
+// ----------------------
+// Datasource & Generator
+// ----------------------
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id            Int            @id @default(autoincrement())
-  name          String
-  email         String         @unique
-  role          Role
-  region        String?
-  password      String
-  online        Boolean        @default(false)
-  lastLogin     DateTime?
-  lastLogout    DateTime?
-  phone         Int            @unique
-  jobs          Job[]          @relation("TechnicianJobs")
-  rollCallUsers RollCallUser[]
-  sessions      Session[]
+generator client {
+  provider = "prisma-client-js"
 }
 
-model Job {
-  id                 Int          @id @default(autoincrement())
-  vehicleReg         String
-  jobType            JobType
-  status             JobStatus    @default(PENDING)
-  scheduledDate      DateTime
-  location           String?
-  governorSerial     String?
-  governorStatus     String?
-  clientName         String?
-  clientPhone        String?
-  remarks            String?
-  photoUrl           String?
-  clientSignature    String?
-  createdAt          DateTime     @default(now())
-  technicianId       Int?
-  assignedTechnician User?        @relation("TechnicianJobs", fields: [technicianId], references: [id])
-  history            JobHistory[]
-  photos             Photo[]
-}
-
-model Session {
-  id         Int       @id @default(autoincrement())
-  userId     Int
-  loginTime  DateTime  @default(now())
-  logoutTime DateTime?
-  active     Boolean   @default(true)
-  latitude   Float?
-  longitude  Float?
-  user       User      @relation(fields: [userId], references: [id])
-}
-
-model RollCallUser {
-  id         Int       @id @default(autoincrement())
-  rollCallId Int
-  userId     Int
-  checkIn    DateTime?
-  checkOut   DateTime?
-  latitude   Float?
-  longitude  Float?
-  status     String?
-  rollCall   RollCall  @relation(fields: [rollCallId], references: [id])
-  user       User      @relation(fields: [userId], references: [id])
-}
-
-model RollCall {
-  id           Int            @id @default(autoincrement())
-  date         DateTime       @default(now())
-  region       String?
-  presentUsers RollCallUser[]
-}
-
-model Photo {
-  id         Int      @id @default(autoincrement())
-  jobId      Int
-  url        String
-  uploadedAt DateTime @default(now())
-  job        Job      @relation(fields: [jobId], references: [id])
-}
-
-model JobHistory {
-  id        Int       @id @default(autoincrement())
-  jobId     Int
-  status    JobStatus
-  remarks   String?
-  latitude  Float?
-  longitude Float?
-  updatedBy Int
-  createdAt DateTime  @default(now())
-  job       Job       @relation(fields: [jobId], references: [id])
-}
-
+// ----------------------
+// Enums
+// ----------------------
 enum Role {
   ADMIN
   TECHNICIAN
@@ -114,4 +32,99 @@ enum JobStatus {
   DONE
   NOT_DONE
   ESCALATED
+}
+
+// ----------------------
+// Models
+// ----------------------
+
+model User {
+  id            Int            @id @default(autoincrement())
+  name          String
+  email         String         @unique
+  phone         String            @unique
+  role          Role
+  region        String?
+  password      String
+  online        Boolean        @default(false)
+  lastLogin     DateTime?
+  lastLogout    DateTime?
+  sessions      Session[]
+  jobs          Job[]          @relation("TechnicianJobs")
+  rollCallUsers RollCallUser[]
+}
+
+model Job {
+  id                 Int          @id @default(autoincrement())
+  vehicleReg         String
+  jobType            JobType
+  status             JobStatus    @default(PENDING)
+  scheduledDate      DateTime
+  location           String?
+  governorSerial     String?
+  governorStatus     String?
+  clientName         String?
+  clientPhone        String?
+  remarks            String?
+  photoUrl           String?
+  clientSignature    String?
+  createdAt          DateTime     @default(now())
+  
+  assignedTechnician User?        @relation("TechnicianJobs", fields: [technicianId], references: [id])
+  technicianId       Int?
+
+  photos             Photo[]
+  history            JobHistory[]
+}
+
+model Session {
+  id         Int       @id @default(autoincrement())
+  user       User      @relation(fields: [userId], references: [id])
+  userId     Int
+  loginTime  DateTime  @default(now())
+  logoutTime DateTime?
+  active     Boolean   @default(true)
+  latitude   Float?
+  longitude  Float?
+}
+
+model RollCallUser {
+  id         Int      @id @default(autoincrement())
+  rollCall   RollCall @relation(fields: [rollCallId], references: [id])
+  rollCallId Int
+  user       User     @relation(fields: [userId], references: [id])
+  userId     Int
+
+  status     String?   // "PRESENT", "CHECKED_OUT"
+  checkIn    DateTime?
+  checkOut   DateTime?
+  latitude   Float?
+  longitude  Float?
+}
+
+model RollCall {
+  id           Int            @id @default(autoincrement())
+  date         DateTime       @default(now())
+  region       String?
+  presentUsers RollCallUser[]
+}
+
+model Photo {
+  id         Int      @id @default(autoincrement())
+  job        Job      @relation(fields: [jobId], references: [id])
+  jobId      Int
+  url        String
+  uploadedAt DateTime @default(now())
+}
+
+model JobHistory {
+  id        Int       @id @default(autoincrement())
+  job       Job       @relation(fields: [jobId], references: [id])
+  jobId     Int
+  status    JobStatus
+  remarks   String?
+  latitude  Float?
+  longitude Float?
+  updatedBy Int       // userId
+  createdAt DateTime  @default(now())
 }

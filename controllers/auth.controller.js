@@ -22,13 +22,20 @@ function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
 }
 
 /**
+ * -------------------------------
+ * Login Controller
+ * -------------------------------
  * @desc Login user with GPS verification for technicians
  * @route POST /api/auth/login
  * @body { email, password, latitude, longitude }
  */
 exports.login = async (req, res) => {
   try {
-    const { email, password, latitude, longitude } = req.body;
+    let { email, password, latitude, longitude } = req.body;
+
+    // Trim inputs
+    email = email?.trim();
+    password = password?.trim();
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
@@ -40,11 +47,13 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
+    // Technician GPS check
     if (user.role === "TECHNICIAN") {
       if (!latitude || !longitude) {
         return res.status(400).json({ message: "GPS coordinates required for technicians" });
       }
 
+      // Set today date at midnight for comparison
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -61,6 +70,7 @@ exports.login = async (req, res) => {
           Nairobi: { latitude: -1.2921, longitude: 36.8219 },
           Mombasa: { latitude: -4.0435, longitude: 39.6682 },
         };
+
         const jobCoords = locationMap[job.location];
         if (jobCoords) {
           const distance = getDistanceFromLatLonInMeters(
@@ -69,7 +79,7 @@ exports.login = async (req, res) => {
             jobCoords.latitude,
             jobCoords.longitude
           );
-          const MAX_DISTANCE = 500;
+          const MAX_DISTANCE = 500; // meters
           if (distance > MAX_DISTANCE) {
             return res.status(403).json({
               message: `Technician too far from job location (${distance.toFixed(0)}m)`,
@@ -79,15 +89,18 @@ exports.login = async (req, res) => {
       }
     }
 
+    // Update user online status
     await prisma.user.update({
       where: { id: user.id },
       data: { online: true, lastLogin: new Date() },
     });
 
+    // Create session
     await prisma.session.create({
       data: { userId: user.id, loginTime: new Date(), active: true, latitude, longitude },
     });
 
+    // Technician roll call check-in
     if (user.role === "TECHNICIAN") {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -115,12 +128,21 @@ exports.login = async (req, res) => {
       }
     }
 
+    // Generate JWT token
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "1d" });
 
     res.json({
       message: "Login successful",
       token,
-      user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, region: user.region, online: true },
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        region: user.region,
+        online: true,
+      },
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -129,13 +151,22 @@ exports.login = async (req, res) => {
 };
 
 /**
+ * -------------------------------
+ * Register Controller
+ * -------------------------------
  * @desc Register user (Admin only)
  * @route POST /api/auth/register
  * @body { name, email, phone, password, role, region }
  */
 exports.register = async (req, res) => {
   try {
-    const { name, email, phone, password, role, region } = req.body;
+    let { name, email, phone, password, role, region } = req.body;
+
+    // Trim inputs
+    name = name?.trim();
+    email = email?.trim();
+    phone = phone?.trim();
+    password = password?.trim();
 
     if (!name || !email || !phone || !password) {
       return res.status(400).json({ message: "Name, email, phone, and password are required" });
@@ -153,9 +184,9 @@ exports.register = async (req, res) => {
 
     const newUser = await prisma.user.create({
       data: {
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
+        name,
+        email,
+        phone,
         password: hashedPassword,
         role: role || "TECHNICIAN",
         region: region || null,
@@ -180,6 +211,9 @@ exports.register = async (req, res) => {
 };
 
 /**
+ * -------------------------------
+ * Logout Controller
+ * -------------------------------
  * @desc Logout user
  * @route POST /api/auth/logout
  * @body { userId }
@@ -192,17 +226,34 @@ exports.logout = async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    await prisma.user.update({ where: { id: userId }, data: { online: false, lastLogout: new Date() } });
-    await prisma.session.updateMany({ where: { userId, active: true }, data: { active: false, logoutTime: new Date() } });
+    // Update user offline
+    await prisma.user.update({
+      where: { id: userId },
+      data: { online: false, lastLogout: new Date() },
+    });
 
+    // Deactivate active sessions
+    await prisma.session.updateMany({
+      where: { userId, active: true },
+      data: { active: false, logoutTime: new Date() },
+    });
+
+    // Technician roll call check-out
     if (user.role === "TECHNICIAN") {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+
       const rollCall = await prisma.rollCall.findFirst({ where: { date: today } });
       if (rollCall) {
-        const rollCallUser = await prisma.rollCallUser.findFirst({ where: { rollCallId: rollCall.id, userId } });
+        const rollCallUser = await prisma.rollCallUser.findFirst({
+          where: { rollCallId: rollCall.id, userId },
+        });
+
         if (rollCallUser && !rollCallUser.checkOut) {
-          await prisma.rollCallUser.update({ where: { id: rollCallUser.id }, data: { checkOut: new Date(), status: "CHECKED_OUT" } });
+          await prisma.rollCallUser.update({
+            where: { id: rollCallUser.id },
+            data: { checkOut: new Date(), status: "CHECKED_OUT" },
+          });
         }
       }
     }

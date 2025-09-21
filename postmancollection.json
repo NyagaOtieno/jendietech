@@ -1,0 +1,182 @@
+{
+  "info": {
+    "name": "JENDIE Tech API",
+    "_postman_id": "b7f80e3a-2e61-4f55-9f76-abcdef123456",
+    "description": "Postman collection for JENDIE Technician Workflow API (Express + Prisma + Neon on Railway)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"johndoe@example.com\",\n  \"phone\": 254701234567,\n  \"password\": \"password123\",\n  \"role\": \"TECHNICIAN\"\n}"
+            },
+            "url": "https://jendietech-production.up.railway.app/api/auth/register"
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer <your_jwt_token>" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Updated\",\n  \"phone\": 254709876543,\n  \"role\": \"ADMIN\"\n}"
+            },
+            "url": "https://jendietech-production.up.railway.app/api/users/2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Jobs",
+      "item": [
+        {
+          "name": "Create Job",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicleReg\": \"KAA111A\",\n  \"jobType\": \"INSTALL\",\n  \"status\": \"PENDING\",\n  \"scheduledDate\": \"2025-09-25T09:00:00Z\",\n  \"location\": \"Kisumu\",\n  \"governorSerial\": \"GSN-12345\",\n  \"clientName\": \"Jane Client\",\n  \"clientPhone\": \"254700123456\",\n  \"remarks\": \"Initial install job\",\n  \"technicianId\": 2\n}"
+            },
+            "url": "https://jendietech-production.up.railway.app/api/jobs"
+          }
+        },
+        {
+          "name": "Update Job Status (History Entry)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": 101,\n  \"status\": \"IN_PROGRESS\",\n  \"remarks\": \"Technician started job\",\n  \"latitude\": -1.2921,\n  \"longitude\": 36.8219,\n  \"updatedBy\": 2\n}"
+            },
+            "url": "https://jendietech-production.up.railway.app/api/jobs/101/history"
+          }
+        },
+        {
+          "name": "Upload Job Photo",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": 101,\n  \"url\": \"https://example.com/photos/job101.jpg\"\n}"
+            },
+            "url": "https://jendietech-production.up.railway.app/api/jobs/101/photos"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sessions",
+      "item": [
+        {
+          "name": "Login Technician (with location)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userId\": 2, \"latitude\": -1.2921, \"longitude\": 36.8219 }"
+            },
+            "url": "https://jendietech-production.up.railway.app/api/sessions/login"
+          }
+        },
+        {
+          "name": "Logout Technician (with location)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"userId\": 2, \"latitude\": -1.2922, \"longitude\": 36.8220 }"
+            },
+            "url": "https://jendietech-production.up.railway.app/api/sessions/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Roll Call",
+      "item": [
+        {
+          "name": "Check In Technician (Roll Call)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"rollCallId\": 1, \"userId\": 2, \"status\": \"PRESENT\", \"latitude\": -1.2921, \"longitude\": 36.8219 }"
+            },
+            "url": "https://jendietech-production.up.railway.app/api/rollcall/checkin"
+          }
+        },
+        {
+          "name": "Check Out Technician (Roll Call)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"rollCallId\": 1, \"userId\": 2, \"status\": \"CHECKED_OUT\", \"latitude\": -1.2925, \"longitude\": 36.8225 }"
+            },
+            "url": "https://jendietech-production.up.railway.app/api/rollcall/checkout"
+          }
+        },
+        {
+  "name": "Reports",
+  "item": [
+    {
+      "name": "Weekly Report (by Region)",
+      "request": {
+        "method": "GET",
+        "url": "https://jendietech-production.up.railway.app/api/reports/weekly?region=Nairobi"
+      }
+    },
+    {
+      "name": "Technician Job Report",
+      "request": {
+        "method": "GET",
+        "url": "https://jendietech-production.up.railway.app/api/reports/technician/2"
+      }
+    },
+    {
+      "name": "Job History Report",
+      "request": {
+        "method": "GET",
+        "url": "https://jendietech-production.up.railway.app/api/reports/jobs/history?jobId=101"
+      }
+    },
+    {
+      "name": "Active Technicians (with location)",
+      "request": {
+        "method": "GET",
+        "url": "https://jendietech-production.up.railway.app/api/reports/technicians/active"
+      }
+    },
+    {
+      "name": "Roll Call Summary (with GPS)",
+      "request": {
+        "method": "GET",
+        "url": "https://jendietech-production.up.railway.app/api/reports/rollcall?region=Nairobi&date=2025-09-21"
+      }
+    }
+  ]
+}
+
+      ]
+    }
+  ]
+}

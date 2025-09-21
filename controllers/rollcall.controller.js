@@ -1,36 +1,58 @@
+const express = require("express");
+const { checkIn, checkOut } = require("../controllers/rollcall.controller");
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
+const router = express.Router();
 
-const checkIn = async (req, res) => {
-  const { rollCallId, userId, status, latitude, longitude } = req.body;
+// Take roll call snapshot
+router.post("/", async (req, res) => {
   try {
-    const entry = await prisma.rollCallUser.create({
+    const { region } = req.body;
+    const presentUsers = await prisma.user.findMany({ where: { online: true, region } });
+
+    const rollCall = await prisma.rollCall.create({
       data: {
-        rollCallId,
-        userId,
-        status,
-        checkIn: new Date(),
-        latitude,
-        longitude
-      }
+        region,
+        presentUsers: {
+          create: presentUsers.map(u => ({ userId: u.id })),
+        },
+      },
+      include: { presentUsers: { include: { user: true } } },
     });
-    res.json(entry);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
 
-const checkOut = async (req, res) => {
-  const { rollCallId, userId, status, latitude, longitude } = req.body;
+    res.json(rollCall);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create roll call" });
+  }
+});
+
+// Check-in technician
+router.post("/checkin", checkIn);
+
+// Check-out technician
+router.post("/checkout", checkOut);
+
+// Get roll call history
+router.get("/", async (req, res) => {
   try {
-    const entry = await prisma.rollCallUser.updateMany({
-      where: { rollCallId, userId },
-      data: { status, checkOut: new Date(), latitude, longitude }
-    });
-    res.json(entry);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
+    const { region, startDate, endDate } = req.query;
 
-module.exports = { checkIn, checkOut };
+    const rollCalls = await prisma.rollCall.findMany({
+      where: {
+        region: region || undefined,
+        date: startDate && endDate
+          ? { gte: new Date(startDate), lte: new Date(endDate) }
+          : undefined,
+      },
+      include: { presentUsers: { include: { user: true } } },
+    });
+
+    res.json(rollCalls);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch roll call history" });
+  }
+});
+
+module.exports = router;

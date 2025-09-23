@@ -32,16 +32,34 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // ----------------------
 app.use("/api/jobs", jobRoutes);
 app.use("/api/reports", reportRoutes);
-app.use("/api/sessions", sessionRoutes);       // Session endpoints
+app.use("/api/sessions", sessionRoutes);
 app.use("/api/rollcall", rollcallRoutes);
-app.use("/api/users", userRoutes);             // User endpoints
-app.use("/api/auth", authRoutes);              // Auth endpoints
+app.use("/api/users", userRoutes);
+app.use("/api/auth", authRoutes);
 
 // ----------------------
 // Health Check
 // ----------------------
 app.get("/", (req, res) => {
   res.json({ message: "🚀 JENDIE Tech API is running!" });
+});
+
+// ----------------------
+// 404 Handler
+// ----------------------
+app.use((req, res, next) => {
+  res.status(404).json({ message: "Route not found" });
+});
+
+// ----------------------
+// Global Error Handler
+// ----------------------
+app.use((err, req, res, next) => {
+  console.error("🔥 Backend Error:", err.stack || err);
+  res.status(500).json({
+    message: "Server error",
+    details: err.message || err,
+  });
 });
 
 // ----------------------

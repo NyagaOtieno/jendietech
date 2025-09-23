@@ -37,17 +37,38 @@ async function main() {
   const tech1Pass = await bcrypt.hash("tech123", 10);
   const tech2Pass = await bcrypt.hash("tech456", 10);
 
-  // Create users
+  // Create users (with phone)
   const admin = await prisma.user.create({
-    data: { name: "Kennedy (Admin)", email: "admin@jendie.com", role: "ADMIN", region: "Nairobi", password: adminPass },
+    data: { 
+      name: "Kennedy (Admin)", 
+      email: "admin@jendie.com", 
+      phone: "+254700000001",
+      role: "ADMIN", 
+      region: "Nairobi", 
+      password: adminPass 
+    },
   });
 
   const tech1 = await prisma.user.create({
-    data: { name: "John Doe", email: "tech1@jendie.com", role: "TECHNICIAN", region: "Nairobi", password: tech1Pass },
+    data: { 
+      name: "John Doe", 
+      email: "tech1@jendie.com", 
+      phone: "+254700000002",
+      role: "TECHNICIAN", 
+      region: "Nairobi", 
+      password: tech1Pass 
+    },
   });
 
   const tech2 = await prisma.user.create({
-    data: { name: "Jane Smith", email: "tech2@jendie.com", role: "TECHNICIAN", region: "Mombasa", password: tech2Pass },
+    data: { 
+      name: "Jane Smith", 
+      email: "tech2@jendie.com", 
+      phone: "+254700000003",
+      role: "TECHNICIAN", 
+      region: "Mombasa", 
+      password: tech2Pass 
+    },
   });
 
   console.log("🔹 Creating rollcall for all technicians...");

@@ -11,27 +11,30 @@ const router = express.Router();
  */
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, emailAddress, phone, phoneNumber, password, role, region } = req.body;
+    const { name, email, phone, password, role, region } = req.body;
 
-    const finalEmail = email || emailAddress || null;
-    const finalPhone = phone || phoneNumber || null;
-
-    if (!name || !password || (!finalEmail && !finalPhone)) {
-      return res.status(400).json({ status: "error", message: "Name, password, and either email or phone are required" });
+    if (!name || !password || (!email && !phone)) {
+      return res.status(400).json({
+        status: "error",
+        message: "Name, password, and either email or phone are required",
+      });
     }
 
     // Check if user exists
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
-          finalEmail ? { email: finalEmail } : undefined,
-          finalPhone ? { phone: finalPhone } : undefined,
+          email ? { email } : undefined,
+          phone ? { phone } : undefined,
         ].filter(Boolean),
       },
     });
 
     if (existingUser) {
-      return res.status(400).json({ status: "error", message: "User already exists with that email/phone" });
+      return res.status(400).json({
+        status: "error",
+        message: "User already exists with that email or phone",
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -39,8 +42,8 @@ router.post("/register", async (req, res) => {
     const user = await prisma.user.create({
       data: {
         name,
-        email: finalEmail,
-        phone: finalPhone,
+        email: email || null,
+        phone: phone || null,
         password: hashedPassword,
         role: role || "TECHNICIAN",
         region,
@@ -50,14 +53,28 @@ router.post("/register", async (req, res) => {
     return res.status(201).json({
       status: "success",
       message: "User created successfully",
-      data: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, region: user.region },
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        region: user.region,
+      },
     });
   } catch (error) {
     console.error("❌ Error creating user:", error);
     if (error.code === "P2002") {
-      return res.status(400).json({ status: "error", message: "Email or phone already exists" });
+      return res.status(400).json({
+        status: "error",
+        message: "Email or phone already exists",
+      });
     }
-    res.status(500).json({ status: "error", message: "Failed to create user", error: error.message });
+    res.status(500).json({
+      status: "error",
+      message: "Failed to create user",
+      error: error.message,
+    });
   }
 });
 
@@ -67,11 +84,14 @@ router.post("/register", async (req, res) => {
  */
 router.post("/login", async (req, res) => {
   try {
-    const { email, emailAddress, phone, phoneNumber, password } = req.body;
+    const { email, phone, password } = req.body;
 
-    const identifier = email || emailAddress || phone || phoneNumber;
+    const identifier = email || phone;
     if (!identifier || !password) {
-      return res.status(400).json({ status: "error", message: "Email/phone and password are required" });
+      return res.status(400).json({
+        status: "error",
+        message: "Email/phone and password are required",
+      });
     }
 
     const user = await prisma.user.findFirst({
@@ -80,10 +100,14 @@ router.post("/login", async (req, res) => {
       },
     });
 
-    if (!user) return res.status(404).json({ status: "error", message: "User not found" });
+    if (!user) {
+      return res.status(404).json({ status: "error", message: "User not found" });
+    }
 
     const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid) return res.status(401).json({ status: "error", message: "Invalid credentials" });
+    if (!isValid) {
+      return res.status(401).json({ status: "error", message: "Invalid credentials" });
+    }
 
     await prisma.user.update({
       where: { id: user.id },
@@ -93,7 +117,14 @@ router.post("/login", async (req, res) => {
     return res.json({
       status: "success",
       message: "Login successful",
-      data: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, region: user.region },
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        region: user.region,
+      },
     });
   } catch (error) {
     console.error("❌ Error logging in:", error);
@@ -108,7 +139,9 @@ router.post("/login", async (req, res) => {
 router.post("/logout", async (req, res) => {
   try {
     const { userId } = req.body;
-    if (!userId) return res.status(400).json({ status: "error", message: "User ID required" });
+    if (!userId) {
+      return res.status(400).json({ status: "error", message: "User ID required" });
+    }
 
     await prisma.user.update({
       where: { id: userId },
@@ -129,7 +162,17 @@ router.post("/logout", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, name: true, email: true, phone: true, role: true, region: true, online: true, lastLogin: true, lastLogout: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        region: true,
+        online: true,
+        lastLogin: true,
+        lastLogout: true,
+      },
     });
     return res.json({ status: "success", data: users });
   } catch (error) {

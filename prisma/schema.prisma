@@ -75,6 +75,7 @@ model Job {
 
   photos             Photo[]
   history            JobHistory[]
+   @@unique([vehicleReg, status])
 }
 
 model Session {

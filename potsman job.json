@@ -1,0 +1,92 @@
+{
+  "info": {
+    "_postman_id": "jendie-jobs-crud",
+    "name": "JENDiE Jobs CRUD",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Job",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"vehicleReg\": \"KCT2552\",\n  \"jobType\": \"INSTALL\",\n  \"status\": \"PENDING\",\n  \"scheduledDate\": \"2025-09-28T09:41:23.258Z\",\n  \"location\": \"Nairobi\",\n  \"governorSerial\": \"GOV559\",\n  \"governorStatus\": \"NEW\",\n  \"clientName\": \"Peter Kiprotich\",\n  \"clientPhone\": \"+254722123456\",\n  \"remarks\": \"Initial installation\",\n  \"technicianId\": 2\n}"
+        },
+        "url": { "raw": "https://jendietech-production.up.railway.app/api/jobs", "protocol": "https", "host": ["jendietech-production", "up", "railway", "app"], "path": ["api", "jobs"] }
+      }
+    },
+    {
+      "name": "Get Jobs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://jendietech-production.up.railway.app/api/jobs?page=1&limit=20",
+          "protocol": "https",
+          "host": ["jendietech-production", "up", "railway", "app"],
+          "path": ["api", "jobs"],
+          "query": [
+            { "key": "page", "value": "1" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Update Job",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 2,\n  \"status\": \"IN_PROGRESS\",\n  \"governorSerial\": \"GOV559\",\n  \"governorStatus\": \"INSTALLED\",\n  \"clientName\": \"Peter Kiprotich\",\n  \"clientPhone\": \"+254722123456\",\n  \"remarks\": \"Installation completed\",\n  \"latitude\": -1.2921,\n  \"longitude\": 36.8219\n}"
+        },
+        "url": {
+          "raw": "https://jendietech-production.up.railway.app/api/jobs/update/1",
+          "protocol": "https",
+          "host": ["jendietech-production", "up", "railway", "app"],
+          "path": ["api", "jobs", "update", "1"]
+        }
+      }
+    },
+    {
+      "name": "Delete Job",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "https://jendietech-production.up.railway.app/api/jobs/1",
+          "protocol": "https",
+          "host": ["jendietech-production", "up", "railway", "app"],
+          "path": ["api", "jobs", "1"]
+        }
+      }
+    },
+    {
+      "name": "Upload Job Photos",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "photos", "type": "file", "src": "/path/to/photo1.jpg" },
+            { "key": "photos", "type": "file", "src": "/path/to/photo2.jpg" }
+          ]
+        },
+        "url": {
+          "raw": "https://jendietech-production.up.railway.app/api/jobs/update/1",
+          "protocol": "https",
+          "host": ["jendietech-production", "up", "railway", "app"],
+          "path": ["api", "jobs", "update", "1"]
+        }
+      }
+    }
+  ]
+}

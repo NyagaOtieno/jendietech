@@ -17,26 +17,46 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // ----------------------
-// CREATE JOB
+// CREATE JOB SAFELY (No Duplication per Day)
 // ----------------------
 router.post("/", async (req, res) => {
   try {
-    const { vehicleReg, jobType, scheduledDate, location, governorSerial, governorStatus, clientName, clientPhone, remarks, technicianId } = req.body;
+    const {
+      vehicleReg,
+      jobType,
+      scheduledDate,
+      location,
+      governorSerial,
+      governorStatus,
+      clientName,
+      clientPhone,
+      remarks,
+      technicianId
+    } = req.body;
 
     if (!vehicleReg || !jobType || !scheduledDate || !technicianId) {
-      return res.status(400).json({ message: "vehicleReg, jobType, scheduledDate, and technicianId are required" });
+      return res.status(400).json({
+        message: "vehicleReg, jobType, scheduledDate, and technicianId are required"
+      });
     }
 
-    // Prevent duplicate jobs for same vehicle + jobType on same day
     const jobDate = new Date(scheduledDate);
     const startOfDay = new Date(jobDate.setHours(0, 0, 0, 0));
     const endOfDay = new Date(jobDate.setHours(23, 59, 59, 999));
 
     const existingJob = await prisma.job.findFirst({
-      where: { vehicleReg, jobType, scheduledDate: { gte: startOfDay, lte: endOfDay } }
+      where: {
+        vehicleReg,
+        jobType,
+        scheduledDate: { gte: startOfDay, lte: endOfDay }
+      }
     });
 
-    if (existingJob) return res.status(400).json({ message: `Job already exists for vehicle ${vehicleReg} (${jobType}) today` });
+    if (existingJob) {
+      return res.status(400).json({
+        message: `Job already exists for vehicle ${vehicleReg} (${jobType}) on ${startOfDay.toISOString().split("T")[0]}`
+      });
+    }
 
     const job = await prisma.job.create({
       data: {
@@ -50,13 +70,20 @@ router.post("/", async (req, res) => {
         clientName,
         clientPhone,
         remarks,
-        assignedTechnician: { connect: { id: Number(technicianId) } }
+        assignedTechnician: {
+          connect: { id: Number(technicianId) }
+        }
       },
       include: { assignedTechnician: true }
     });
 
     await prisma.jobHistory.create({
-      data: { jobId: job.id, status: "PENDING", remarks: "Job created", updatedBy: Number(technicianId) }
+      data: {
+        jobId: job.id,
+        status: "PENDING",
+        remarks: "Job created",
+        updatedBy: Number(technicianId)
+      }
     });
 
     res.status(201).json({ message: "Job created successfully", data: job });
@@ -67,17 +94,22 @@ router.post("/", async (req, res) => {
 });
 
 // ----------------------
-// GET JOBS
+// GET JOBS WITH FILTERS + PAGINATION
 // ----------------------
 router.get("/", async (req, res) => {
   try {
     const { technicianId, region, status, startDate, endDate, page = 1, limit = 20 } = req.query;
+
     const filters = {
       technicianId: technicianId ? Number(technicianId) : undefined,
       status: status || undefined,
-      scheduledDate: startDate && endDate ? { gte: new Date(startDate), lte: new Date(endDate) } : undefined,
+      scheduledDate:
+        startDate && endDate
+          ? { gte: new Date(startDate), lte: new Date(endDate) }
+          : undefined,
       assignedTechnician: region ? { region } : undefined
     };
+
     Object.keys(filters).forEach(key => filters[key] === undefined && delete filters[key]);
 
     const jobs = await prisma.job.findMany({
@@ -90,7 +122,13 @@ router.get("/", async (req, res) => {
 
     const total = await prisma.job.count({ where: filters });
 
-    res.json({ page: Number(page), limit: Number(limit), total, totalPages: Math.ceil(total / Number(limit)), jobs });
+    res.json({
+      page: Number(page),
+      limit: Number(limit),
+      total,
+      totalPages: Math.ceil(total / Number(limit)),
+      jobs
+    });
   } catch (err) {
     console.error("❌ Error fetching jobs:", err);
     res.status(500).json({ message: "Server error" });
@@ -98,12 +136,26 @@ router.get("/", async (req, res) => {
 });
 
 // ----------------------
-// UPDATE JOB + PHOTO UPLOAD
+// UPDATE EXISTING JOB + PHOTO UPLOAD
 // ----------------------
 router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
   try {
     const jobId = Number(req.params.id);
-    const { userId, status, governorSerial, governorStatus, clientName, clientPhone, remarks, latitude, longitude, technicianId, vehicleReg, jobType, scheduledDate } = req.body;
+    const {
+      userId,
+      status,
+      governorSerial,
+      governorStatus,
+      clientName,
+      clientPhone,
+      remarks,
+      latitude,
+      longitude,
+      technicianId,
+      vehicleReg,
+      jobType,
+      scheduledDate
+    } = req.body;
 
     const jobExists = await prisma.job.findUnique({ where: { id: jobId } });
     if (!jobExists) return res.status(404).json({ message: "Job not found" });
@@ -114,7 +166,9 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
         vehicleReg: vehicleReg || jobExists.vehicleReg,
         jobType: jobType || jobExists.jobType,
         scheduledDate: scheduledDate ? new Date(scheduledDate) : jobExists.scheduledDate,
-        assignedTechnician: technicianId ? { connect: { id: Number(technicianId) } } : undefined,
+        assignedTechnician: technicianId
+          ? { connect: { id: Number(technicianId) } }
+          : undefined,
         status: status || jobExists.status,
         governorSerial: governorSerial || jobExists.governorSerial,
         governorStatus: governorStatus || jobExists.governorStatus,
@@ -125,37 +179,54 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
     });
 
     if (userId) {
-      await prisma.session.updateMany({ where: { userId: Number(userId), active: true }, data: { latitude: latitude || null, longitude: longitude || null } });
-      await prisma.jobHistory.create({ data: { jobId, status: status || jobExists.status, remarks: remarks || "", latitude: latitude || null, longitude: longitude || null, updatedBy: Number(userId) } });
+      await prisma.session.updateMany({
+        where: { userId: Number(userId), active: true },
+        data: { latitude: latitude || null, longitude: longitude || null }
+      });
+
+      await prisma.jobHistory.create({
+        data: {
+          jobId,
+          status: status || jobExists.status,
+          remarks: remarks || "",
+          latitude: latitude || null,
+          longitude: longitude || null,
+          updatedBy: Number(userId)
+        }
+      });
     }
 
     // Upload photos if any
     if (req.files && req.files.length > 0) {
-      const photosData = req.files.map(file => ({ jobId, url: `uploads/${file.filename}`, uploadedAt: new Date() }));
+      const photosData = req.files.map(file => ({
+        jobId,
+        url: `uploads/${file.filename}`,
+        uploadedAt: new Date()
+      }));
       await prisma.photo.createMany({ data: photosData });
     }
 
     res.json({ message: "Job updated successfully", job: updatedJob });
   } catch (err) {
     console.error("❌ Error updating job:", err);
-    res.status(500).json({ message: "Server error", error: err.message });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
 // ----------------------
-// DELETE JOB
+// DELETE JOB + PHOTOS
 // ----------------------
 router.delete("/:id", async (req, res) => {
   try {
     const jobId = Number(req.params.id);
 
-    // Delete associated photos from filesystem
+    // Delete photos from filesystem
     const photos = await prisma.photo.findMany({ where: { jobId } });
     photos.forEach(photo => {
       if (fs.existsSync(photo.url)) fs.unlinkSync(photo.url);
     });
 
-    // Delete job and cascade history/photos
+    // Delete job, history, photos
     await prisma.jobHistory.deleteMany({ where: { jobId } });
     await prisma.photo.deleteMany({ where: { jobId } });
     await prisma.job.delete({ where: { id: jobId } });

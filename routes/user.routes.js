@@ -10,21 +10,34 @@ const router = express.Router();
  */
 router.post("/login", async (req, res) => {
   try {
-    const { email, emailAddress, phone, phoneNumber, password } = req.body;
-    const identifier = email || emailAddress || phone || phoneNumber;
+    const { email, phone, password } = req.body;
 
-    if (!identifier || !password) {
-      return res.status(400).json({ status: "error", message: "Email/phone and password are required" });
+    if ((!email && !phone) || !password) {
+      return res.status(400).json({
+        status: "error",
+        message: "Email or phone and password are required",
+      });
     }
 
     const user = await prisma.user.findFirst({
-      where: { OR: [{ email: identifier }, { phone: identifier }] },
+      where: {
+        OR: [
+          email ? { email: email.trim() } : undefined,
+          phone ? { phone: phone.toString().trim() } : undefined,
+        ].filter(Boolean),
+      },
     });
 
-    if (!user) return res.status(404).json({ status: "error", message: "User not found" });
+    if (!user)
+      return res
+        .status(404)
+        .json({ status: "error", message: "User not found" });
 
     const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid) return res.status(401).json({ status: "error", message: "Invalid credentials" });
+    if (!isValid)
+      return res
+        .status(401)
+        .json({ status: "error", message: "Invalid credentials" });
 
     await prisma.user.update({
       where: { id: user.id },
@@ -45,7 +58,11 @@ router.post("/login", async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error logging in:", error);
-    res.status(500).json({ status: "error", message: "Failed to login", error: error.message });
+    res.status(500).json({
+      status: "error",
+      message: "Failed to login",
+      error: error.message,
+    });
   }
 });
 
@@ -55,7 +72,10 @@ router.post("/login", async (req, res) => {
 router.post("/logout", async (req, res) => {
   try {
     const { userId } = req.body;
-    if (!userId) return res.status(400).json({ status: "error", message: "User ID required" });
+    if (!userId)
+      return res
+        .status(400)
+        .json({ status: "error", message: "User ID required" });
 
     await prisma.user.update({
       where: { id: userId },
@@ -65,7 +85,11 @@ router.post("/logout", async (req, res) => {
     return res.json({ status: "success", message: "Logout successful" });
   } catch (error) {
     console.error("❌ Error logging out:", error);
-    res.status(500).json({ status: "error", message: "Failed to logout", error: error.message });
+    res.status(500).json({
+      status: "error",
+      message: "Failed to logout",
+      error: error.message,
+    });
   }
 });
 
@@ -101,21 +125,30 @@ router.post("/", async (req, res) => {
   try {
     let { name, email, phone, password, role, region } = req.body;
 
-    // Ensure phone is always a string
-    phone = phone?.toString().trim();
     email = email?.toString().trim() || null;
+    phone = phone?.toString().trim() || null;
 
-    if (!name || !password || !phone) {
-      return res.status(400).json({ status: "error", message: "Name, password, and phone are required" });
+    if (!name || !password || (!email && !phone)) {
+      return res.status(400).json({
+        status: "error",
+        message: "Name, password, and at least email or phone are required",
+      });
     }
 
     // Check if user exists
     const existingUser = await prisma.user.findFirst({
-      where: { OR: [{ email }, { phone }] },
+      where: {
+        OR: [
+          email ? { email } : undefined,
+          phone ? { phone } : undefined,
+        ].filter(Boolean),
+      },
     });
 
     if (existingUser) {
-      return res.status(400).json({ status: "error", message: "User already exists with that email or phone" });
+      return res
+        .status(400)
+        .json({ status: "error", message: "User already exists with email or phone" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -146,7 +179,9 @@ router.post("/", async (req, res) => {
   } catch (error) {
     console.error("❌ Error creating user:", error);
     if (error.code === "P2002") {
-      return res.status(400).json({ status: "error", message: "Email or phone already exists" });
+      return res
+        .status(400)
+        .json({ status: "error", message: "Email or phone already exists" });
     }
     res.status(500).json({ status: "error", message: "Failed to create user", error: error.message });
   }

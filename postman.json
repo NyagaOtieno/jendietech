@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "JENDiE Tech API",
+    "name": "JENDiE Tech API - Enhanced",
     "_postman_id": "c6e6e9f2-9f42-4b92-bfb2-b3d47dfc7201",
-    "description": "Postman collection for JENDiE Technician Workflow API",
+    "description": "Postman collection for JENDiE Technician Workflow API with enhanced endpoints",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -10,9 +10,7 @@
       "name": "Auth - Login (Admin)",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"email\": \"admin@jendie.com\",\n  \"password\": \"admin123\"\n}"
@@ -30,9 +28,7 @@
       "name": "Auth - Login (Technician)",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
         "body": {
           "mode": "raw",
           "raw": "{\n  \"email\": \"tech1@jendie.com\",\n  \"password\": \"tech123\"\n}"
@@ -42,6 +38,24 @@
           "protocol": "https",
           "host": ["jendietech-production", "up", "railway", "app"],
           "path": ["api", "auth", "login"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Auth - Register User",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"New Tech\",\n  \"email\": \"newtech@test.com\",\n  \"phone\": \"+254701234567\",\n  \"password\": \"tech123\",\n  \"role\": \"TECHNICIAN\",\n  \"region\": \"Nairobi\"\n}"
+        },
+        "url": {
+          "raw": "https://jendietech-production.up.railway.app/api/auth/register",
+          "protocol": "https",
+          "host": ["jendietech-production", "up", "railway", "app"],
+          "path": ["api", "auth", "register"]
         }
       },
       "response": []
@@ -71,9 +85,7 @@
       "name": "Users - Get All",
       "request": {
         "method": "GET",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{token}}" }
-        ],
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
         "url": {
           "raw": "https://jendietech-production.up.railway.app/api/users",
           "protocol": "https",
@@ -84,17 +96,24 @@
       "response": []
     },
     {
-      "name": "Jobs - Get All",
+      "name": "Jobs - Get All (with filters & pagination)",
       "request": {
         "method": "GET",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{token}}" }
-        ],
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
         "url": {
-          "raw": "https://jendietech-production.up.railway.app/api/jobs",
+          "raw": "https://jendietech-production.up.railway.app/api/jobs?technicianId=1&region=Nairobi&status=PENDING&startDate=2025-01-01&endDate=2025-12-31&page=1&limit=20",
           "protocol": "https",
           "host": ["jendietech-production", "up", "railway", "app"],
-          "path": ["api", "jobs"]
+          "path": ["api", "jobs"],
+          "query": [
+            { "key": "technicianId", "value": "1" },
+            { "key": "region", "value": "Nairobi" },
+            { "key": "status", "value": "PENDING" },
+            { "key": "startDate", "value": "2025-01-01" },
+            { "key": "endDate", "value": "2025-12-31" },
+            { "key": "page", "value": "1" },
+            { "key": "limit", "value": "20" }
+          ]
         }
       },
       "response": []
@@ -103,9 +122,7 @@
       "name": "RollCall - Get All",
       "request": {
         "method": "GET",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{token}}" }
-        ],
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
         "url": {
           "raw": "https://jendietech-production.up.railway.app/api/rollcall",
           "protocol": "https",

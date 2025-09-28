@@ -7,7 +7,6 @@ const router = express.Router();
 
 /**
  * Login User
- * Route: POST /api/users/login
  */
 router.post("/login", async (req, res) => {
   try {
@@ -52,7 +51,6 @@ router.post("/login", async (req, res) => {
 
 /**
  * Logout User
- * Route: POST /api/users/logout
  */
 router.post("/logout", async (req, res) => {
   try {
@@ -73,7 +71,6 @@ router.post("/logout", async (req, res) => {
 
 /**
  * Get All Users
- * Route: GET /api/users
  */
 router.get("/", async (req, res) => {
   try {
@@ -99,30 +96,22 @@ router.get("/", async (req, res) => {
 
 /**
  * Create User safely
- * Route: POST /api/users
  */
 router.post("/", async (req, res) => {
   try {
-    const { name, email, emailAddress, phone, phoneNumber, password, role, region } = req.body;
+    let { name, email, phone, password, role, region } = req.body;
 
-    const finalEmail = email || emailAddress || null;
-    const finalPhone = phone || phoneNumber || null;
+    // Ensure phone is always a string
+    phone = phone?.toString().trim();
+    email = email?.toString().trim() || null;
 
-    if (!name || !password || (!finalEmail && !finalPhone)) {
-      return res.status(400).json({
-        status: "error",
-        message: "Name, password, and at least email or phone are required",
-      });
+    if (!name || !password || !phone) {
+      return res.status(400).json({ status: "error", message: "Name, password, and phone are required" });
     }
 
-    // Check if user exists (only check non-null fields)
+    // Check if user exists
     const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          finalEmail ? { email: finalEmail } : undefined,
-          finalPhone ? { phone: finalPhone } : undefined,
-        ].filter(Boolean),
-      },
+      where: { OR: [{ email }, { phone }] },
     });
 
     if (existingUser) {
@@ -134,8 +123,8 @@ router.post("/", async (req, res) => {
     const user = await prisma.user.create({
       data: {
         name,
-        email: finalEmail,
-        phone: finalPhone,
+        email,
+        phone,
         password: hashedPassword,
         role: role || "TECHNICIAN",
         region: region || null,
@@ -156,12 +145,10 @@ router.post("/", async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error creating user:", error);
-
     if (error.code === "P2002") {
       return res.status(400).json({ status: "error", message: "Email or phone already exists" });
     }
-
-    return res.status(500).json({ status: "error", message: "Failed to create user", error: error.message });
+    res.status(500).json({ status: "error", message: "Failed to create user", error: error.message });
   }
 });
 

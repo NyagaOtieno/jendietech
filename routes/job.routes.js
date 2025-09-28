@@ -9,21 +9,53 @@ const router = express.Router();
 // Setup file storage for photo uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) =>
-    cb(null, `${Date.now()}-${file.originalname}`)
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
 const upload = multer({ storage });
 
 /**
- * Create a new job
+ * Create a new job safely
  */
 router.post("/", async (req, res) => {
   try {
-    const job = await prisma.job.create({ data: req.body });
-    res.json(job);
+    const {
+      vehicleReg,
+      jobType,
+      status,
+      scheduledDate,
+      location,
+      governorSerial,
+      governorStatus,
+      clientName,
+      clientPhone,
+      remarks,
+      photoUrl,
+      clientSignature,
+      technicianId,
+    } = req.body;
+
+    // Build jobData object only with defined fields
+    const jobData = {
+      vehicleReg,
+      jobType,
+      status: status || "PENDING",
+      scheduledDate: scheduledDate ? new Date(scheduledDate) : new Date(),
+      location,
+      governorSerial,
+      governorStatus,
+      clientName,
+      clientPhone,
+      remarks,
+      photoUrl,
+      clientSignature,
+      technicianId: technicianId ? Number(technicianId) : undefined,
+    };
+
+    const job = await prisma.job.create({ data: jobData });
+    res.status(201).json({ message: "Job created successfully", data: job });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    console.error("❌ Error creating job:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 

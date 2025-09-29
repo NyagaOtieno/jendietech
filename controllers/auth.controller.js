@@ -10,22 +10,6 @@ const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
  * ---------------------- */
 
 /**
- * Haversine formula to calculate distance between two GPS points in meters
- */
-const getDistanceFromLatLonInMeters = (lat1, lon1, lat2, lon2) => {
-  const R = 6371000; // meters
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
-
-/**
  * Create or get today's rollcall entry for a technician
  */
 const handleRollCall = async (user, latitude, longitude) => {
@@ -57,46 +41,6 @@ const handleRollCall = async (user, latitude, longitude) => {
   }
 };
 
-/**
- * Validate technician location against job
- */
-const validateTechnicianLocation = async (user, latitude, longitude) => {
-  if (!latitude || !longitude)
-    throw { status: 400, message: "GPS coordinates required for technicians" };
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const job = await prisma.job.findFirst({
-    where: {
-      technicianId: user.id,
-      scheduledDate: { gte: today },
-      status: { in: ["PENDING", "IN_PROGRESS"] },
-    },
-  });
-
-  if (job && job.location) {
-    const locationMap = {
-      Nairobi: { latitude: -1.2921, longitude: 36.8219 },
-      Mombasa: { latitude: -4.0435, longitude: 39.6682 },
-    };
-    const jobCoords = locationMap[job.location];
-    if (jobCoords) {
-      const distance = getDistanceFromLatLonInMeters(
-        latitude,
-        longitude,
-        jobCoords.latitude,
-        jobCoords.longitude
-      );
-      if (distance > 500)
-        throw {
-          status: 403,
-          message: `Too far from job location (${distance.toFixed(0)}m)`,
-        };
-    }
-  }
-};
-
 /** ----------------------
  * Controllers
  * ---------------------- */
@@ -117,30 +61,25 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
-    // Technician GPS validation
-    if (user.role === "TECHNICIAN")
-      await validateTechnicianLocation(user, latitude, longitude);
-
     // Update login state
     await prisma.user.update({
       where: { id: user.id },
       data: { online: true, lastLogin: new Date() },
     });
 
-    // Record session
+    // Record session with technician location
     await prisma.session.create({
       data: {
         userId: user.id,
         loginTime: new Date(),
         active: true,
-        latitude,
-        longitude,
+        latitude: latitude || null,
+        longitude: longitude || null,
       },
     });
 
-    // Handle rollcall
-    if (user.role === "TECHNICIAN")
-      await handleRollCall(user, latitude, longitude);
+    // Handle rollcall only for technicians
+    if (user.role === "TECHNICIAN") await handleRollCall(user, latitude, longitude);
 
     // Generate token
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, {
@@ -163,9 +102,7 @@ exports.login = async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error);
-    res
-      .status(error.status || 500)
-      .json({ message: error.message || "Server error" });
+    res.status(500).json({ message: error.message || "Server error" });
   }
 };
 
@@ -234,7 +171,7 @@ exports.register = async (req, res) => {
  */
 exports.logout = async (req, res) => {
   try {
-    const { userId } = req.body;
+    const { userId, latitude, longitude } = req.body;
     if (!userId)
       return res.status(400).json({ message: "User ID required" });
 
@@ -245,11 +182,18 @@ exports.logout = async (req, res) => {
       where: { id: userId },
       data: { online: false, lastLogout: new Date() },
     });
+
     await prisma.session.updateMany({
       where: { userId, active: true },
-      data: { active: false, logoutTime: new Date() },
+      data: {
+        active: false,
+        logoutTime: new Date(),
+        latitude: latitude || null,
+        longitude: longitude || null,
+      },
     });
 
+    // Update rollcall checkout for technicians
     if (user.role === "TECHNICIAN") {
       const today = new Date();
       today.setHours(0, 0, 0, 0);

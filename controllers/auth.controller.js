@@ -1,4 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
+const { PrismaClient } = require("@prisma/client"); 
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
@@ -34,8 +34,8 @@ const handleRollCall = async (user, latitude, longitude) => {
         userId: user.id,
         status: "PRESENT",
         checkIn: new Date(),
-        latitude: latitude || null,
-        longitude: longitude || null,
+        latitude,
+        longitude,
       },
     });
   }
@@ -61,20 +61,25 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
+    // Require location for technicians
+    if (user.role === "TECHNICIAN" && (latitude === undefined || longitude === undefined)) {
+      return res.status(400).json({ message: "Technicians must provide latitude and longitude" });
+    }
+
     // Update login state
     await prisma.user.update({
       where: { id: user.id },
       data: { online: true, lastLogin: new Date() },
     });
 
-    // Record session with technician location
+    // Record session with location
     await prisma.session.create({
       data: {
         userId: user.id,
         loginTime: new Date(),
         active: true,
-        latitude: latitude || null,
-        longitude: longitude || null,
+        latitude,
+        longitude,
       },
     });
 
@@ -178,6 +183,11 @@ exports.logout = async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // Require location for technicians
+    if (user.role === "TECHNICIAN" && (latitude === undefined || longitude === undefined)) {
+      return res.status(400).json({ message: "Technicians must provide latitude and longitude" });
+    }
+
     // Update user online state
     await prisma.user.update({
       where: { id: userId },
@@ -190,8 +200,8 @@ exports.logout = async (req, res) => {
       data: {
         active: false,
         logoutTime: new Date(),
-        latitude: latitude || null,
-        longitude: longitude || null,
+        latitude,
+        longitude,
       },
     });
 

@@ -34,8 +34,8 @@ const handleRollCall = async (user, latitude, longitude) => {
         userId: user.id,
         status: "PRESENT",
         checkIn: new Date(),
-        latitude,
-        longitude,
+        latitude: latitude || null,
+        longitude: longitude || null,
       },
     });
   }
@@ -178,11 +178,13 @@ exports.logout = async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // Update user online state
     await prisma.user.update({
       where: { id: userId },
       data: { online: false, lastLogout: new Date() },
     });
 
+    // Update active session with logout location
     await prisma.session.updateMany({
       where: { userId, active: true },
       data: {
@@ -193,7 +195,7 @@ exports.logout = async (req, res) => {
       },
     });
 
-    // Update rollcall checkout for technicians
+    // Rollcall checkout for technicians
     if (user.role === "TECHNICIAN") {
       const today = new Date();
       today.setHours(0, 0, 0, 0);

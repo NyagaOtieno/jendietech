@@ -22,7 +22,7 @@ const app = express();
 // ----------------------
 process.on("uncaughtException", (err) => {
   console.error("❌ UNCAUGHT EXCEPTION:", err.message);
-  console.error(err.stack);
+  console.error("📂 Stack Trace:", err.stack);
 });
 
 process.on("unhandledRejection", (reason, promise) => {
@@ -60,18 +60,29 @@ app.get("/", (req, res) => {
 // 404 Handler
 // ----------------------
 app.use((req, res, next) => {
+  console.warn(`⚠️ 404 Not Found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({ message: "Route not found" });
 });
 
 // ----------------------
-// Global Error Handler
+// Global Error Handler (with detailed logs)
 // ----------------------
 app.use((err, req, res, next) => {
   console.error("🔥 Backend Error:", err.message);
-  console.error(err.stack);
+  console.error("📂 Stack Trace:", err.stack);
+
+  console.error("📌 Request Info:", {
+    method: req.method,
+    url: req.originalUrl,
+    body: req.body,
+    params: req.params,
+    query: req.query,
+  });
+
   res.status(500).json({
-    message: "Server error",
-    details: err.message || err,
+    message: err.message || "Server error",
+    stack: err.stack,   // include stack trace
+    details: err,       // raw error object
   });
 });
 

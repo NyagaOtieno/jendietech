@@ -9,13 +9,25 @@ const jobRoutes = require("./routes/job.routes");
 const reportRoutes = require("./routes/report.routes");
 const sessionRoutes = require("./routes/session.routes");
 const rollcallRoutes = require("./routes/rollcall.routes");
-const userRoutes = require("./routes/user.routes");   
-const authRoutes = require("./routes/auth.routes");   
+const userRoutes = require("./routes/user.routes");
+const authRoutes = require("./routes/auth.routes");
 
 // ----------------------
 // Initialize App
 // ----------------------
 const app = express();
+
+// ----------------------
+// Debug Hooks (Catch Hidden Errors)
+// ----------------------
+process.on("uncaughtException", (err) => {
+  console.error("❌ UNCAUGHT EXCEPTION:", err.message);
+  console.error(err.stack);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("❌ UNHANDLED REJECTION:", reason);
+});
 
 // ----------------------
 // Middleware
@@ -55,7 +67,8 @@ app.use((req, res, next) => {
 // Global Error Handler
 // ----------------------
 app.use((err, req, res, next) => {
-  console.error("🔥 Backend Error:", err.stack || err);
+  console.error("🔥 Backend Error:", err.message);
+  console.error(err.stack);
   res.status(500).json({
     message: "Server error",
     details: err.message || err,

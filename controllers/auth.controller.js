@@ -1,4 +1,3 @@
-// auth.controller.js
 const { PrismaClient } = require("@prisma/client"); 
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -62,7 +61,10 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
-    // ✅ Technicians can login from anywhere (no distance check)
+    // Require location for technicians
+    if (user.role === "TECHNICIAN" && (latitude === undefined || longitude === undefined)) {
+      return res.status(400).json({ message: "Technicians must provide latitude and longitude" });
+    }
 
     // Update login state
     await prisma.user.update({
@@ -70,21 +72,19 @@ exports.login = async (req, res) => {
       data: { online: true, lastLogin: new Date() },
     });
 
-    // Record session with optional location
+    // Record session with location
     await prisma.session.create({
       data: {
         userId: user.id,
         loginTime: new Date(),
         active: true,
-        latitude: latitude || null,
-        longitude: longitude || null,
+        latitude,
+        longitude,
       },
     });
 
-    // Optional rollcall for technicians
-    if (user.role === "TECHNICIAN") {
-      await handleRollCall(user, latitude || null, longitude || null);
-    }
+    // Handle rollcall only for technicians
+    if (user.role === "TECHNICIAN") await handleRollCall(user, latitude, longitude);
 
     // Generate token
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, {
@@ -183,20 +183,25 @@ exports.logout = async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // Require location for technicians
+    if (user.role === "TECHNICIAN" && (latitude === undefined || longitude === undefined)) {
+      return res.status(400).json({ message: "Technicians must provide latitude and longitude" });
+    }
+
     // Update user online state
     await prisma.user.update({
       where: { id: userId },
       data: { online: false, lastLogout: new Date() },
     });
 
-    // Update active session with optional logout location
+    // Update active session with logout location
     await prisma.session.updateMany({
       where: { userId, active: true },
       data: {
         active: false,
         logoutTime: new Date(),
-        latitude: latitude || null,
-        longitude: longitude || null,
+        latitude,
+        longitude,
       },
     });
 

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "build": "echo 'No frontend to build yet'",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
@@ -38,5 +39,8 @@
     "@types/multer": "^2.0.0",
     "nodemon": "^3.1.0",
     "prisma": "^6.16.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }

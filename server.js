@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const { execSync } = require("child_process"); // for running Prisma commands
 
 // ----------------------
 // Import Routes
@@ -74,6 +75,19 @@ app.use((err, req, res, next) => {
     details: err.message || err,
   });
 });
+
+// ----------------------
+// Run Prisma Migrations & Seed (Railway-friendly)
+// ----------------------
+try {
+  console.log("🔧 Running Prisma migrations...");
+  execSync("npx prisma migrate deploy", { stdio: "inherit" });
+
+  console.log("🌱 Seeding the database...");
+  execSync("node prisma/seed.js", { stdio: "inherit" });
+} catch (err) {
+  console.error("❌ Error running migrations or seed:", err);
+}
 
 // ----------------------
 // Start Server

@@ -1,4 +1,4 @@
-# Use the official Node.js LTS image
+# Use official Node.js LTS image
 FROM node:20-alpine
 
 # Set working directory inside the container
@@ -22,11 +22,10 @@ RUN npx prisma migrate deploy
 # Seed the database
 RUN node prisma/seed.js
 
-# Set environment variables (these can also be set in Railway dashboard)
+# Set environment variables (Railway sets PORT automatically)
 ENV NODE_ENV=production
-ENV PORT=3000
 
-# Expose the port
+# Expose Railway dynamic port (Railway will override this)
 EXPOSE 3000
 
 # Start the server

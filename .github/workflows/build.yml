@@ -10,28 +10,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 🧩 Checkout code
+      - name: 🧾 Checkout code
         uses: actions/checkout@v4
 
-      - name: ⚙️ Setup Bun
+      - name: 🔧 Setup Bun
         uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
 
       - name: 📦 Install dependencies
-        run: bun install --no-save
+        run: bun install
 
-      - name: 🧱 Generate Prisma client
+      - name: ⚙️ Generate Prisma client
         run: bunx prisma generate
 
-      - name: 🧪 Run database migrations
+      - name: 🧩 Run database migrations
         run: bunx prisma migrate deploy
 
-      - name: 🌱 Seed database
+      - name: 🌱 Seed database (optional)
         run: bun run seed
 
-      - name: 🚀 Deploy to Railway
-        uses: railwayapp/railway-deploy@v2
-        with:
-          token: ${{ secrets.RAILWAY_TOKEN }}
-          service: technician
+      - name: 🚀 Deploy to Railway using CLI
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          npm install -g @railway/cli
+          railway link --service technician --yes
+          railway up --service technician

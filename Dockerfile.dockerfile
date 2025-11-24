@@ -9,6 +9,12 @@ COPY package.json package-lock.json ./
 
 # Install dependencies using NPM
 RUN npm install --production
+  
+
+RUN npx prisma migrate deploy
+
+RUN node prisma/seed.js
+
 
 # Copy the rest of the project
 COPY . .

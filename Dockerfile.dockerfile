@@ -7,26 +7,19 @@ WORKDIR /app
 # Copy package.json and package-lock.json first for caching
 COPY package.json package-lock.json ./
 
-# Install dependencies using NPM
+# Install dependencies
 RUN npm install --production
-  
 
-RUN npx prisma migrate deploy
-
-RUN node prisma/seed.js
-
-
-# Copy the rest of the project
+# Copy the rest of the project (including prisma folder)
 COPY . .
 
 # Generate Prisma client
 RUN npx prisma generate
 
-
 # Set environment variables (Railway sets PORT automatically)
 ENV NODE_ENV=production
 
-# Expose Railway dynamic port (Railway will override this)
+# Expose port
 EXPOSE 3000
 
 # Start the server

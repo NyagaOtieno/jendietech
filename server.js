@@ -79,15 +79,28 @@ app.use((err, req, res, next) => {
 // ----------------------
 // Run Prisma Migrations & Seed (Railway-friendly)
 // ----------------------
+// ----------------------
+// Run Prisma Migrations & Seed (Safe)
+// ----------------------
+// ----------------------
+// Run Prisma Migrations & Safe Seeding
+// ----------------------
 try {
   console.log("🔧 Running Prisma migrations...");
   execSync("npx prisma migrate deploy", { stdio: "inherit" });
 
-  console.log("🌱 Seeding the database...");
-  execSync("node prisma/seed.js", { stdio: "inherit" });
+  // Only seed locally
+  if (process.env.NODE_ENV !== "production") {
+    console.log("🌱 Seeding local database (development only)...");
+    execSync("node prisma/seed.js", { stdio: "inherit" });
+  } else {
+    console.log("⛔ Production mode: Skipping seed.");
+  }
+
 } catch (err) {
   console.error("❌ Error running migrations or seed:", err);
 }
+
 
 // ----------------------
 // Start Server

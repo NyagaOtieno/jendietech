@@ -16,11 +16,7 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Apply Prisma migrations (automatically deploys migrations to your DB)
-RUN npx prisma migrate deploy
 
-# Seed the database
-RUN node prisma/seed.js
 
 # Set environment variables (Railway sets PORT automatically)
 ENV NODE_ENV=production

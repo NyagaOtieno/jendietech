@@ -17,7 +17,6 @@ COPY . .
 RUN npx prisma generate
 
 
-
 # Set environment variables (Railway sets PORT automatically)
 ENV NODE_ENV=production
 

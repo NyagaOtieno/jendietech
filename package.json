@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "JENDIE Technician Workflow backend with Express, Prisma, and Neon Postgres",
   "main": "server.js",
-
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",

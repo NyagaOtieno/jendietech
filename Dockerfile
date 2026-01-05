@@ -4,10 +4,13 @@ FROM node:20-alpine
 # Set working directory inside the container
 WORKDIR /app
 
+# Install OS-level dependencies (Alpine uses apk, not apt)
+RUN apk add --no-cache libatomic bash
+
 # Copy package.json and package-lock.json first for caching
 COPY package.json package-lock.json ./
 
-# Install dependencies
+# Install npm dependencies
 RUN npm install --production
 
 # Copy the rest of the project (including prisma folder)

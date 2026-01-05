@@ -16,11 +16,11 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Set environment variables (Railway sets PORT automatically)
+# Set environment variables
 ENV NODE_ENV=production
 
 # Expose port
 EXPOSE 3000
 
-# Start the server
-CMD ["node", "server.js"]
+# Run migrations at container start, then start server
+CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]

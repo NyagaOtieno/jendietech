@@ -1,0 +1,4 @@
+echo "$(Get-Date)" > .docker-cache-break
+git add .docker-cache-break
+git commit -m "Invalidate Docker build cache"
+git push

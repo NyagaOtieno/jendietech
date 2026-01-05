@@ -21,6 +21,7 @@
     "backend",
     "workflow"
   ],
+  
   "author": "Kennedy",
   "license": "MIT",
   "dependencies": {
@@ -34,12 +35,14 @@
     "morgan": "^1.10.1",
     "multer": "^2.0.2"
   },
+
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
     "nodemon": "^3.1.0",
     "prisma": "^6.16.2"
   },
+
   "engines": {
     "node": ">=20.0.0"
   }

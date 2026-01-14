@@ -26,7 +26,19 @@ exports.getUserById = async (req, res) => {
 // Update user
 exports.updateUser = async (req, res) => {
   const { id } = req.params;
-  const { name, phone, role, region } = req.body;
+  let { name, email, phone, password, role, region } = req.body;
+   phone = phone?.toString().trim() || null;
+   if (phone && !isValidKenyanPhone(phone)) {
+  return res.status(400).json({
+    status: "error",
+    message:
+      "Invalid phone format. Use +2547XXXXXXXX, +2541XXXXXXXX, 07XXXXXXXX, or 01XXXXXXXX",
+  });
+}
+
+if (phone) {
+  phone = normalizeKenyanPhone(phone);
+}
   try {
     const updated = await prisma.user.update({
       where: { id: Number(id) },

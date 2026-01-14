@@ -2,6 +2,12 @@ const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
+const {
+  isValidKenyanPhone,
+  normalizeKenyanPhone,
+} = require("../utils/phone.util");
+
+
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
@@ -117,23 +123,54 @@ exports.login = async (req, res) => {
  */
 exports.register = async (req, res) => {
   try {
-    const {
-      fullName,
-      nationalId,
-      password,
-      emailAddress,
-      phone,
-      primaryLocation,
-      specialization,
-      role,
-    } = req.body;
+  let {
+  fullName,
+  nationalId,
+  password,
+  emailAddress,
+  phone,
+  primaryLocation,
+  specialization,
+  role,
+} = req.body;
 
-    const email = emailAddress;
-    const name = fullName;
-    const region = primaryLocation;
+const email = emailAddress;
+const name = fullName;
+const region = primaryLocation;
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser)
+// --------------------
+// PHONE VALIDATION
+// --------------------
+phone = phone?.toString().trim() || null;
+
+if (!phone) {
+  return res.status(400).json({ message: "Phone number is required" });
+}
+
+if (!isValidKenyanPhone(phone)) {
+  return res.status(400).json({
+    message:
+      "Invalid phone format. Use +2547XXXXXXXX, +2541XXXXXXXX, 07XXXXXXXX, or 01XXXXXXXX",
+  });
+}
+
+// Normalize to +254 format
+phone = normalizeKenyanPhone(phone);
+
+
+
+    const existingUser = await prisma.user.findFirst({
+  where: {
+    OR: [{ email }, { phone }],
+  },
+});
+
+if (existingUser) {
+  return res.status(400).json({
+    message: "User already exists with this email or phone number",
+  });
+}
+
       return res.status(400).json({ message: "User already exists" });
 
     const hashedPassword = await bcrypt.hash(password, 10);

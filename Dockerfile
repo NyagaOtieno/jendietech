@@ -1,28 +1,22 @@
-# Use official Node.js LTS
 FROM node:20-alpine
 
-# Set working directory
 WORKDIR /app
 
-# Copy dependency files first (for cache)
+# Install all dependencies (including dev)
 COPY package.json package-lock.json ./
+RUN npm ci
 
-# Install production dependencies
-RUN npm ci --omit=dev
-
-# Copy application source
+# Copy project files
 COPY . .
+
+# Make prisma CLI executable
+RUN chmod +x node_modules/.bin/prisma
 
 # Generate Prisma client
 RUN npx prisma generate
 
-# Environment
 ENV NODE_ENV=production
 
-# Railway injects PORT automatically
 EXPOSE 3000
 
-# Start app (run migrations then start server)
-CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
-
-# Force Railway rebuild 2026-01-15 01:25:09
+CMD ["node", "server.js"]

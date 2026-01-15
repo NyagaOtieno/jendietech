@@ -1,29 +1,26 @@
-# Use official Node.js LTS image
+# Use official Node.js LTS
 FROM node:20-alpine
 
-# Set working directory inside the container
+# Set working directory
 WORKDIR /app
 
-# Install OS-level dependencies (Alpine uses apk, not apt)
-RUN apk add --no-cache libatomic bash
-
-# Copy package.json and package-lock.json first for caching
+# Copy dependency files first (for cache)
 COPY package.json package-lock.json ./
 
-# Install npm dependencies
-RUN npm install --production
+# Install production dependencies
+RUN npm ci --omit=dev
 
-# Copy the rest of the project (including prisma folder)
+# Copy application source
 COPY . .
 
 # Generate Prisma client
 RUN npx prisma generate
 
-# Set environment variables
+# Environment
 ENV NODE_ENV=production
 
-# Expose port
+# Railway injects PORT automatically
 EXPOSE 3000
 
-# Run migrations at container start, then start server
+# Start app (run migrations then start server)
 CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]

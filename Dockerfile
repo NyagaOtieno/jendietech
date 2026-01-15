@@ -24,3 +24,5 @@ EXPOSE 3000
 
 # Start app (run migrations then start server)
 CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
+
+# Force Railway rebuild 2026-01-15 01:25:09

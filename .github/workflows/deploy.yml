@@ -31,8 +31,8 @@ jobs:
         run: bun run build
 
       - name: Deploy to Railway
-        uses: railwayapp/railway-deploy@v1
+        uses: railwayapp/cli-action@v2
         with:
+          railwayToken: ${{ secrets.RAILWAY_TOKEN }}
           service: jendietech
           environment: production
-          token: ${{ secrets.RAILWAY_TOKEN }}

@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs");
 
 const prisma = new PrismaClient();
 const router = express.Router();
+const { isValidKenyanPhone, normalizeKenyanPhone } = require("../utils/phone.util");
 
 /**
  * Login User
@@ -121,7 +122,8 @@ router.get("/", async (req, res) => {
 /**
  * Create User safely
  */
-router.post("/", async (req, res) => {
+
+exports.createUser = async (req, res) => {
   try {
     let { name, email, phone, password, role, region } = req.body;
 
@@ -135,6 +137,18 @@ router.post("/", async (req, res) => {
       });
     }
 
+    // Validate and normalize phone
+    if (phone) {
+      if (!isValidKenyanPhone(phone)) {
+        return res.status(400).json({
+          status: "error",
+          message:
+            "Invalid phone format. Use +2547XXXXXXXX, +2541XXXXXXXX, 07XXXXXXXX, or 01XXXXXXXX",
+        });
+      }
+      phone = normalizeKenyanPhone(phone);
+    }
+
     // Check if user exists
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -146,11 +160,14 @@ router.post("/", async (req, res) => {
     });
 
     if (existingUser) {
-      return res
-        .status(400)
-        .json({ status: "error", message: "User already exists with email or phone" });
+      return res.status(400).json({
+        status: "error",
+        message: "User already exists with email or phone",
+      });
     }
 
+    // Hash password
+    const bcrypt = require("bcryptjs");
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
@@ -179,12 +196,18 @@ router.post("/", async (req, res) => {
   } catch (error) {
     console.error("❌ Error creating user:", error);
     if (error.code === "P2002") {
-      return res
-        .status(400)
-        .json({ status: "error", message: "Email or phone already exists" });
+      return res.status(400).json({
+        status: "error",
+        message: "Email or phone already exists",
+      });
     }
-    res.status(500).json({ status: "error", message: "Failed to create user", error: error.message });
+    res.status(500).json({
+      status: "error",
+      message: "Failed to create user",
+      error: error.message,
+    });
   }
-});
+};
+
 
 module.exports = router;

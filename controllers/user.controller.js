@@ -1,5 +1,6 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
+const { isValidKenyanPhone, normalizeKenyanPhone } = require("../utils/phone.util");
 
 // Get all users
 exports.getAllUsers = async (req, res) => {
@@ -27,28 +28,33 @@ exports.getUserById = async (req, res) => {
 exports.updateUser = async (req, res) => {
   const { id } = req.params;
   let { name, email, phone, password, role, region } = req.body;
-   phone = phone?.toString().trim() || null;
-   if (phone && !isValidKenyanPhone(phone)) {
-  return res.status(400).json({
-    status: "error",
-    message:
-      "Invalid phone format. Use +2547XXXXXXXX, +2541XXXXXXXX, 07XXXXXXXX, or 01XXXXXXXX",
-  });
-}
 
-if (phone) {
-  phone = normalizeKenyanPhone(phone);
-}
+  // Trim phone
+  phone = phone?.toString().trim() || null;
+
+  // Validate and normalize phone if provided
+  if (phone) {
+    if (!isValidKenyanPhone(phone)) {
+      return res.status(400).json({
+        status: "error",
+        message:
+          "Invalid phone format. Use +2547XXXXXXXX, +2541XXXXXXXX, 07XXXXXXXX, or 01XXXXXXXX",
+      });
+    }
+    phone = normalizeKenyanPhone(phone);
+  }
+
   try {
     const updated = await prisma.user.update({
       where: { id: Number(id) },
-      data: { name, phone, role, region },
+      data: { name, email, phone, role, region },
     });
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+
 
 // Delete user
 exports.deleteUser = async (req, res) => {

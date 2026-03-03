@@ -86,7 +86,23 @@ app.use((err, req, res, next) => {
 if (process.env.NODE_ENV === "production") {
   try {
     console.log("🔧 Running Prisma migrations...");
-    execSync("npx prisma migrate deploy", { stdio: "inherit" });
+   const path = require("path");
+const { execSync } = require("child_process");
+
+function prismaCli(cmd) {
+  const prismaJs = path.join(__dirname, "node_modules", "prisma", "build", "index.js");
+  execSync(`node ${prismaJs} ${cmd}`, { stdio: "inherit" });
+}
+
+// ✅ Run migrations safely on Alpine
+try {
+  prismaCli("migrate deploy");
+  console.log("✅ Migrations applied");
+} catch (e) {
+  console.error("❌ Migration error:", e);
+  // If you want the server to still start even when migration fails, don't exit
+  // process.exit(1);
+}
   } catch (err) {
     console.error("❌ Migration error:", err);
   }

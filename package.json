@@ -14,7 +14,7 @@
     "seed": "node prisma/seed.js",
     "sms-worker": "node workers/startSmsWorker.js",
     "postinstall": "node -e \"process.env.SKIP_PRISMA_GENERATE==='1' ? console.log('skip prisma generate') : require('child_process').execSync('npx prisma generate',{stdio:'inherit'})\"",
-    "migrate:deploy": "prisma migrate deploy"
+    "migrate:deploy": "node node_modules/prisma/build/index.js migrate deploy"
   },
   "keywords": [
     "express",

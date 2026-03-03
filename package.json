@@ -11,7 +11,8 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "prisma:seed": "node prisma/seed.js",
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js",
+    "sms-worker": "node workers/startSmsWorker.js"
   },
   "keywords": [
     "express",
@@ -21,11 +22,11 @@
     "backend",
     "workflow"
   ],
-  
   "author": "Kennedy",
   "license": "MIT",
   "dependencies": {
     "@prisma/client": "^6.16.2",
+    "axios": "^1.13.6",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
@@ -35,14 +36,12 @@
     "morgan": "^1.10.1",
     "multer": "^2.0.2"
   },
-
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
     "nodemon": "^3.1.0",
     "prisma": "^6.16.2"
   },
-
   "engines": {
     "node": ">=20.0.0"
   }

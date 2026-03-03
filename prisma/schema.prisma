@@ -73,8 +73,11 @@ model Job {
   assignedTechnician User? @relation("TechnicianJobs", fields: [technicianId], references: [id])
   technicianId       Int?
 
-  photos  Photo[]
-  history JobHistory[]
+  photos          Photo[]
+  history         JobHistory[]
+  SmsOutbox       SmsOutbox[]
+  FeedbackToken   FeedbackToken[]
+  ServiceFeedback ServiceFeedback[]
 
   @@unique([vehicleReg, status])
 }
@@ -129,4 +132,44 @@ model JobHistory {
   longitude Float?
   updatedBy Int // userId
   createdAt DateTime  @default(now())
+}
+
+model SmsOutbox {
+  id           BigInt    @id @default(autoincrement())
+  jobId        Int?
+  toPhone      String
+  message      String
+  status       String    @default("PENDING") // PENDING | SENT | FAILED
+  scheduledFor DateTime  @default(now())
+  sentAt       DateTime?
+  retries      Int       @default(0)
+  lastError    String?
+  createdAt    DateTime  @default(now())
+
+  job Job? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([status, scheduledFor])
+}
+
+model FeedbackToken {
+  id        BigInt    @id @default(autoincrement())
+  jobId     Int
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model ServiceFeedback {
+  id        BigInt   @id @default(autoincrement())
+  jobId     Int
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
 }

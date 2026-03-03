@@ -6,7 +6,8 @@ const fs = require("fs");
 
 const prisma = new PrismaClient();
 const router = express.Router();
-
+const { queueSms, createFeedbackToken } = require("../services/sms/smsQueue");
+const { normalizeKenyaPhone, buildJobDoneClientSms, buildFeedbackSms } = require("../utils/sms");
 // ----------------------
 // Multer storage for photos
 // ----------------------
@@ -212,7 +213,37 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+const newStatus = String(status || jobExists.status || "").toUpperCase();
+const oldStatus = String(jobExists.status || "").toUpperCase();
 
+if (oldStatus !== "DONE" && newStatus === "DONE") {
+  const to = normalizeKenyaPhone(updatedJob.clientPhone || jobExists.clientPhone);
+  if (to) {
+    // 1) completion SMS now
+    await queueSms({
+      jobId,
+      toPhone: to,
+      message: buildJobDoneClientSms({
+        clientName: updatedJob.clientName,
+        vehicleReg: updatedJob.vehicleReg,
+        jobType: updatedJob.jobType
+      }),
+      scheduledFor: new Date()
+    });
+
+    // 2) feedback link SMS after 15 minutes
+    const token = await createFeedbackToken(jobId);
+    const base = String(process.env.APP_PUBLIC_URL || "").replace(/\/+$/, "");
+    const link = `${base}/r/${token}`;
+
+    await queueSms({
+      jobId,
+      toPhone: to,
+      message: buildFeedbackSms({ clientName: updatedJob.clientName, feedbackLink: link }),
+      scheduledFor: new Date(Date.now() + 15 * 60 * 1000)
+    });
+  }
+}
 // ----------------------
 // DELETE JOB + PHOTOS
 // ----------------------

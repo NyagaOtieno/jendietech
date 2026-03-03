@@ -3,19 +3,25 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# ✅ Needed on alpine for some node binaries + prisma engines
+RUN apk add --no-cache libc6-compat openssl
+
 # Copy package files first for caching
 COPY package.json package-lock.json ./
 
-# ✅ Copy prisma schema BEFORE npm ci (so postinstall/prisma can find it if it runs)
+# Copy prisma schema BEFORE npm ci
 COPY prisma ./prisma
 
 # Install all deps (dev + prod)
 RUN npm ci
 
+# ✅ Ensure prisma binary is executable (fix Permission denied)
+RUN chmod +x node_modules/.bin/prisma
+
 # Copy the rest of the app
 COPY . .
 
-# Generate Prisma client (safe even if postinstall already did)
+# Generate Prisma client
 RUN npx prisma generate
 
 # Stage 2: Production runtime
@@ -24,18 +30,15 @@ FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copy package files
-COPY package.json package-lock.json ./
+RUN apk add --no-cache libc6-compat openssl
 
-# ✅ Copy prisma schema BEFORE npm ci --omit=dev (so postinstall prisma generate won't fail)
+COPY package.json package-lock.json ./
 COPY prisma ./prisma
 
-# Install only production deps
 RUN npm ci --omit=dev
 
 # Copy the built app + generated prisma client from builder
 COPY --from=builder /app ./
 
 EXPOSE 3000
-
 CMD ["node", "server.js"]

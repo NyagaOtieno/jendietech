@@ -12,7 +12,9 @@
     "prisma:studio": "prisma studio",
     "prisma:seed": "node prisma/seed.js",
     "seed": "node prisma/seed.js",
-    "sms-worker": "node workers/startSmsWorker.js"
+    "sms-worker": "node workers/startSmsWorker.js",
+    "postinstall": "prisma generate",
+    "migrate:deploy": "prisma migrate deploy"
   },
   "keywords": [
     "express",

@@ -1,4 +1,4 @@
-const { PrismaClient } = require("@prisma/client"); 
+const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
@@ -51,7 +51,10 @@ const handleRollCall = async (user, latitude, longitude) => {
  */
 exports.login = async (req, res) => {
   try {
-    const { email, password, latitude, longitude } = req.body;
+    // keep your behavior, just normalize email
+    const email = (req.body.email || "").trim().toLowerCase();
+    const { password, latitude, longitude } = req.body;
+
     if (!email || !password)
       return res.status(400).json({ message: "Email and password required" });
 
@@ -117,24 +120,48 @@ exports.login = async (req, res) => {
  */
 exports.register = async (req, res) => {
   try {
+    // Accept BOTH naming styles (old + new)
     const {
+      // old fields
       fullName,
       nationalId,
-      password,
       emailAddress,
-      phone,
       primaryLocation,
+
+      // new fields
+      name: nameNew,
+      email: emailNew,
+      region: regionNew,
+
+      // shared
+      password,
+      phone,
       specialization,
       role,
     } = req.body;
 
-    const email = emailAddress;
-    const name = fullName;
-    const region = primaryLocation;
+    const email = (emailNew || emailAddress || "").trim().toLowerCase();
+    const name = (nameNew || fullName || "").trim();
+    const region = regionNew || primaryLocation || null;
+    const phoneClean = phone ? String(phone).trim() : null;
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser)
-      return res.status(400).json({ message: "User already exists" });
+    // ✅ Validate early (avoid Prisma crash)
+    if (!email) return res.status(400).json({ message: "Email is required" });
+    if (!name) return res.status(400).json({ message: "Name is required" });
+    if (!password) return res.status(400).json({ message: "Password is required" });
+
+    // Check duplicates by email
+    const existingByEmail = await prisma.user.findUnique({ where: { email } });
+    if (existingByEmail) return res.status(409).json({ message: "User already exists (email)" });
+
+    // If phone is unique in your schema, also guard it (safe)
+    if (phoneClean) {
+      const existingByPhone = await prisma.user
+        .findUnique({ where: { phone: phoneClean } })
+        .catch(() => null);
+
+      if (existingByPhone) return res.status(409).json({ message: "User already exists (phone)" });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -143,11 +170,11 @@ exports.register = async (req, res) => {
         name,
         email,
         password: hashedPassword,
-        phone,
-        nationalId,
+        phone: phoneClean,
+        nationalId: nationalId || null,
         role: role || "TECHNICIAN",
         region,
-        specialization,
+        specialization: specialization || null,
       },
     });
 
@@ -165,8 +192,12 @@ exports.register = async (req, res) => {
       },
     });
   } catch (error) {
+    // Handle Prisma unique constraint nicely
+    if (error?.code === "P2002") {
+      return res.status(409).json({ message: "User already exists (unique constraint)" });
+    }
     console.error("Register error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: error.message || "Server error" });
   }
 };
 

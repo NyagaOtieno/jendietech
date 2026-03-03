@@ -1,4 +1,4 @@
-const { PrismaClient } = require("@prisma/client");
+const { PrismaClient } = require("@prisma/client"); 
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
@@ -51,10 +51,7 @@ const handleRollCall = async (user, latitude, longitude) => {
  */
 exports.login = async (req, res) => {
   try {
-    // keep your behavior, just normalize email
-    const email = (req.body.email || "").trim().toLowerCase();
-    const { password, latitude, longitude } = req.body;
-
+    const { email, password, latitude, longitude } = req.body;
     if (!email || !password)
       return res.status(400).json({ message: "Email and password required" });
 
@@ -142,24 +139,23 @@ exports.register = async (req, res) => {
 
     const email = (emailNew || emailAddress || "").trim().toLowerCase();
     const name = (nameNew || fullName || "").trim();
-    const region = regionNew || primaryLocation || null;
-    const phoneClean = phone ? String(phone).trim() : null;
+    const region = (regionNew || primaryLocation || null);
 
     // ✅ Validate early (avoid Prisma crash)
     if (!email) return res.status(400).json({ message: "Email is required" });
     if (!name) return res.status(400).json({ message: "Name is required" });
     if (!password) return res.status(400).json({ message: "Password is required" });
 
-    // Check duplicates by email
+    // optional: normalize phone a bit
+    const phoneClean = phone ? String(phone).trim() : null;
+
+    // Check duplicates by email (and optionally phone)
     const existingByEmail = await prisma.user.findUnique({ where: { email } });
     if (existingByEmail) return res.status(409).json({ message: "User already exists (email)" });
 
-    // If phone is unique in your schema, also guard it (safe)
+    // If phone is unique in your schema, also guard it:
     if (phoneClean) {
-      const existingByPhone = await prisma.user
-        .findUnique({ where: { phone: phoneClean } })
-        .catch(() => null);
-
+      const existingByPhone = await prisma.user.findUnique({ where: { phone: phoneClean } }).catch(() => null);
       if (existingByPhone) return res.status(409).json({ message: "User already exists (phone)" });
     }
 
@@ -192,7 +188,7 @@ exports.register = async (req, res) => {
       },
     });
   } catch (error) {
-    // Handle Prisma unique constraint nicely
+    // handle Prisma unique errors nicely (if you have unique constraints)
     if (error?.code === "P2002") {
       return res.status(409).json({ message: "User already exists (unique constraint)" });
     }

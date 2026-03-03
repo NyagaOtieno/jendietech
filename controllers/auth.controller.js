@@ -1,4 +1,4 @@
-const { PrismaClient } = require("@prisma/client"); 
+const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
@@ -52,6 +52,7 @@ const handleRollCall = async (user, latitude, longitude) => {
 exports.login = async (req, res) => {
   try {
     const { email, password, latitude, longitude } = req.body;
+
     if (!email || !password)
       return res.status(400).json({ message: "Email and password required" });
 
@@ -61,18 +62,15 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
-    // Require location for technicians
     if (user.role === "TECHNICIAN" && (latitude === undefined || longitude === undefined)) {
       return res.status(400).json({ message: "Technicians must provide latitude and longitude" });
     }
 
-    // Update login state
     await prisma.user.update({
       where: { id: user.id },
       data: { online: true, lastLogin: new Date() },
     });
 
-    // Record session with location
     await prisma.session.create({
       data: {
         userId: user.id,
@@ -83,10 +81,9 @@ exports.login = async (req, res) => {
       },
     });
 
-    // Handle rollcall only for technicians
-    if (user.role === "TECHNICIAN") await handleRollCall(user, latitude, longitude);
+    if (user.role === "TECHNICIAN")
+      await handleRollCall(user, latitude, longitude);
 
-    // Generate token
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, {
       expiresIn: "1d",
     });
@@ -117,11 +114,9 @@ exports.login = async (req, res) => {
  */
 exports.register = async (req, res) => {
   try {
-    // Accept BOTH naming styles (old + new)
     const {
       // old fields
       fullName,
-      nationalId,
       emailAddress,
       primaryLocation,
 
@@ -139,24 +134,25 @@ exports.register = async (req, res) => {
 
     const email = (emailNew || emailAddress || "").trim().toLowerCase();
     const name = (nameNew || fullName || "").trim();
-    const region = (regionNew || primaryLocation || null);
+    const region = regionNew || primaryLocation || null;
 
-    // ✅ Validate early (avoid Prisma crash)
     if (!email) return res.status(400).json({ message: "Email is required" });
     if (!name) return res.status(400).json({ message: "Name is required" });
     if (!password) return res.status(400).json({ message: "Password is required" });
 
-    // optional: normalize phone a bit
     const phoneClean = phone ? String(phone).trim() : null;
 
-    // Check duplicates by email (and optionally phone)
     const existingByEmail = await prisma.user.findUnique({ where: { email } });
-    if (existingByEmail) return res.status(409).json({ message: "User already exists (email)" });
+    if (existingByEmail)
+      return res.status(409).json({ message: "User already exists (email)" });
 
-    // If phone is unique in your schema, also guard it:
     if (phoneClean) {
-      const existingByPhone = await prisma.user.findUnique({ where: { phone: phoneClean } }).catch(() => null);
-      if (existingByPhone) return res.status(409).json({ message: "User already exists (phone)" });
+      const existingByPhone = await prisma.user
+        .findUnique({ where: { phone: phoneClean } })
+        .catch(() => null);
+
+      if (existingByPhone)
+        return res.status(409).json({ message: "User already exists (phone)" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -167,7 +163,6 @@ exports.register = async (req, res) => {
         email,
         password: hashedPassword,
         phone: phoneClean,
-        nationalId: nationalId || null,
         role: role || "TECHNICIAN",
         region,
         specialization: specialization || null,
@@ -183,12 +178,10 @@ exports.register = async (req, res) => {
         role: newUser.role,
         region: newUser.region,
         phone: newUser.phone,
-        nationalId: newUser.nationalId,
         specialization: newUser.specialization,
       },
     });
   } catch (error) {
-    // handle Prisma unique errors nicely (if you have unique constraints)
     if (error?.code === "P2002") {
       return res.status(409).json({ message: "User already exists (unique constraint)" });
     }
@@ -204,24 +197,22 @@ exports.register = async (req, res) => {
 exports.logout = async (req, res) => {
   try {
     const { userId, latitude, longitude } = req.body;
+
     if (!userId)
       return res.status(400).json({ message: "User ID required" });
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Require location for technicians
     if (user.role === "TECHNICIAN" && (latitude === undefined || longitude === undefined)) {
       return res.status(400).json({ message: "Technicians must provide latitude and longitude" });
     }
 
-    // Update user online state
     await prisma.user.update({
       where: { id: userId },
       data: { online: false, lastLogout: new Date() },
     });
 
-    // Update active session with logout location
     await prisma.session.updateMany({
       where: { userId, active: true },
       data: {
@@ -232,15 +223,16 @@ exports.logout = async (req, res) => {
       },
     });
 
-    // Rollcall checkout for technicians
     if (user.role === "TECHNICIAN") {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+
       const rollCall = await prisma.rollCall.findFirst({ where: { date: today } });
       if (rollCall) {
         const rollCallUser = await prisma.rollCallUser.findFirst({
           where: { rollCallId: rollCall.id, userId },
         });
+
         if (rollCallUser && !rollCallUser.checkOut) {
           await prisma.rollCallUser.update({
             where: { id: rollCallUser.id },

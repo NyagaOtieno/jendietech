@@ -6,14 +6,21 @@ const fs = require("fs");
 
 const prisma = new PrismaClient();
 const router = express.Router();
+
+// ✅ SMS imports (kept)
 const { queueSms, createFeedbackToken } = require("../services/sms/smsQueue");
-const { normalizeKenyaPhone, buildJobDoneClientSms, buildFeedbackSms } = require("../utils/sms");
+const {
+  normalizeKenyaPhone,
+  buildJobDoneClientSms,
+  buildFeedbackSms,
+} = require("../utils/sms");
+
 // ----------------------
 // Multer storage for photos
 // ----------------------
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
 });
 const upload = multer({ storage });
 
@@ -32,12 +39,13 @@ router.post("/", async (req, res) => {
       clientName,
       clientPhone,
       remarks,
-      technicianId
+      technicianId,
     } = req.body;
 
     if (!vehicleReg || !jobType || !scheduledDate || !technicianId) {
       return res.status(400).json({
-        message: "vehicleReg, jobType, scheduledDate, and technicianId are required"
+        message:
+          "vehicleReg, jobType, scheduledDate, and technicianId are required",
       });
     }
 
@@ -49,13 +57,15 @@ router.post("/", async (req, res) => {
       where: {
         vehicleReg,
         jobType,
-        scheduledDate: { gte: startOfDay, lte: endOfDay }
-      }
+        scheduledDate: { gte: startOfDay, lte: endOfDay },
+      },
     });
 
     if (existingJob) {
       return res.status(400).json({
-        message: `Job already exists for vehicle ${vehicleReg} (${jobType}) on ${startOfDay.toISOString().split("T")[0]}`
+        message: `Job already exists for vehicle ${vehicleReg} (${jobType}) on ${
+          startOfDay.toISOString().split("T")[0]
+        }`,
       });
     }
 
@@ -72,10 +82,10 @@ router.post("/", async (req, res) => {
         clientPhone,
         remarks,
         assignedTechnician: {
-          connect: { id: Number(technicianId) }
-        }
+          connect: { id: Number(technicianId) },
+        },
       },
-      include: { assignedTechnician: true }
+      include: { assignedTechnician: true },
     });
 
     await prisma.jobHistory.create({
@@ -83,8 +93,8 @@ router.post("/", async (req, res) => {
         jobId: job.id,
         status: "PENDING",
         remarks: "Job created",
-        updatedBy: Number(technicianId)
-      }
+        updatedBy: Number(technicianId),
+      },
     });
 
     res.status(201).json({ message: "Job created successfully", data: job });
@@ -99,7 +109,15 @@ router.post("/", async (req, res) => {
 // ----------------------
 router.get("/", async (req, res) => {
   try {
-    const { technicianId, region, status, startDate, endDate, page = 1, limit = 20 } = req.query;
+    const {
+      technicianId,
+      region,
+      status,
+      startDate,
+      endDate,
+      page = 1,
+      limit = 20,
+    } = req.query;
 
     const filters = {
       technicianId: technicianId ? Number(technicianId) : undefined,
@@ -108,17 +126,19 @@ router.get("/", async (req, res) => {
         startDate && endDate
           ? { gte: new Date(startDate), lte: new Date(endDate) }
           : undefined,
-      assignedTechnician: region ? { region } : undefined
+      assignedTechnician: region ? { region } : undefined,
     };
 
-    Object.keys(filters).forEach(key => filters[key] === undefined && delete filters[key]);
+    Object.keys(filters).forEach(
+      (key) => filters[key] === undefined && delete filters[key]
+    );
 
     const jobs = await prisma.job.findMany({
       where: filters,
       include: { assignedTechnician: true, photos: true, history: true },
       skip: (Number(page) - 1) * Number(limit),
       take: Number(limit),
-      orderBy: { scheduledDate: "desc" }
+      orderBy: { scheduledDate: "desc" },
     });
 
     const total = await prisma.job.count({ where: filters });
@@ -128,7 +148,7 @@ router.get("/", async (req, res) => {
       limit: Number(limit),
       total,
       totalPages: Math.ceil(total / Number(limit)),
-      jobs
+      jobs,
     });
   } catch (err) {
     console.error("❌ Error fetching jobs:", err);
@@ -155,7 +175,7 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
       technicianId,
       vehicleReg,
       jobType,
-      scheduledDate
+      scheduledDate,
     } = req.body;
 
     const jobExists = await prisma.job.findUnique({ where: { id: jobId } });
@@ -166,7 +186,9 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
       data: {
         vehicleReg: vehicleReg || jobExists.vehicleReg,
         jobType: jobType || jobExists.jobType,
-        scheduledDate: scheduledDate ? new Date(scheduledDate) : jobExists.scheduledDate,
+        scheduledDate: scheduledDate
+          ? new Date(scheduledDate)
+          : jobExists.scheduledDate,
         assignedTechnician: technicianId
           ? { connect: { id: Number(technicianId) } }
           : undefined,
@@ -175,14 +197,15 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
         governorStatus: governorStatus || jobExists.governorStatus,
         clientName: clientName || jobExists.clientName,
         clientPhone: clientPhone || jobExists.clientPhone,
-        remarks: remarks || jobExists.remarks
-      }
+        remarks: remarks || jobExists.remarks,
+      },
     });
 
+    // ✅ Update session GPS (kept)
     if (userId) {
       await prisma.session.updateMany({
         where: { userId: Number(userId), active: true },
-        data: { latitude: latitude || null, longitude: longitude || null }
+        data: { latitude: latitude || null, longitude: longitude || null },
       });
 
       await prisma.jobHistory.create({
@@ -192,19 +215,58 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
           remarks: remarks || "",
           latitude: latitude || null,
           longitude: longitude || null,
-          updatedBy: Number(userId)
-        }
+          updatedBy: Number(userId),
+        },
       });
     }
 
-    // Upload photos if any
+    // ✅ Upload photos if any (kept)
     if (req.files && req.files.length > 0) {
-      const photosData = req.files.map(file => ({
+      const photosData = req.files.map((file) => ({
         jobId,
         url: `uploads/${file.filename}`,
-        uploadedAt: new Date()
+        uploadedAt: new Date(),
       }));
       await prisma.photo.createMany({ data: photosData });
+    }
+
+    // ✅ SMS block (FIXED placement: inside route, no functions removed)
+    const newStatus = String(status || jobExists.status || "").toUpperCase();
+    const oldStatus = String(jobExists.status || "").toUpperCase();
+
+    if (oldStatus !== "DONE" && newStatus === "DONE") {
+      const to = normalizeKenyaPhone(
+        updatedJob.clientPhone || jobExists.clientPhone
+      );
+
+      if (to) {
+        // 1) completion SMS now
+        await queueSms({
+          jobId,
+          toPhone: to,
+          message: buildJobDoneClientSms({
+            clientName: updatedJob.clientName,
+            vehicleReg: updatedJob.vehicleReg,
+            jobType: updatedJob.jobType,
+          }),
+          scheduledFor: new Date(),
+        });
+
+        // 2) feedback link SMS after 15 minutes
+        const token = await createFeedbackToken(jobId);
+        const base = String(process.env.APP_PUBLIC_URL || "").replace(/\/+$/, "");
+        const link = `${base}/r/${token}`;
+
+        await queueSms({
+          jobId,
+          toPhone: to,
+          message: buildFeedbackSms({
+            clientName: updatedJob.clientName,
+            feedbackLink: link,
+          }),
+          scheduledFor: new Date(Date.now() + 15 * 60 * 1000),
+        });
+      }
     }
 
     res.json({ message: "Job updated successfully", job: updatedJob });
@@ -213,37 +275,7 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-const newStatus = String(status || jobExists.status || "").toUpperCase();
-const oldStatus = String(jobExists.status || "").toUpperCase();
 
-if (oldStatus !== "DONE" && newStatus === "DONE") {
-  const to = normalizeKenyaPhone(updatedJob.clientPhone || jobExists.clientPhone);
-  if (to) {
-    // 1) completion SMS now
-    await queueSms({
-      jobId,
-      toPhone: to,
-      message: buildJobDoneClientSms({
-        clientName: updatedJob.clientName,
-        vehicleReg: updatedJob.vehicleReg,
-        jobType: updatedJob.jobType
-      }),
-      scheduledFor: new Date()
-    });
-
-    // 2) feedback link SMS after 15 minutes
-    const token = await createFeedbackToken(jobId);
-    const base = String(process.env.APP_PUBLIC_URL || "").replace(/\/+$/, "");
-    const link = `${base}/r/${token}`;
-
-    await queueSms({
-      jobId,
-      toPhone: to,
-      message: buildFeedbackSms({ clientName: updatedJob.clientName, feedbackLink: link }),
-      scheduledFor: new Date(Date.now() + 15 * 60 * 1000)
-    });
-  }
-}
 // ----------------------
 // DELETE JOB + PHOTOS
 // ----------------------
@@ -253,7 +285,7 @@ router.delete("/:id", async (req, res) => {
 
     // Delete photos from filesystem
     const photos = await prisma.photo.findMany({ where: { jobId } });
-    photos.forEach(photo => {
+    photos.forEach((photo) => {
       if (fs.existsSync(photo.url)) fs.unlinkSync(photo.url);
     });
 

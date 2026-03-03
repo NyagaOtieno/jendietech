@@ -108,10 +108,6 @@ exports.login = async (req, res) => {
   }
 };
 
-/**
- * @desc Register user
- * @route POST /api/auth/register
- */
 exports.register = async (req, res) => {
   try {
     const {
@@ -128,7 +124,6 @@ exports.register = async (req, res) => {
       // shared
       password,
       phone,
-      specialization,
       role,
     } = req.body;
 
@@ -143,16 +138,14 @@ exports.register = async (req, res) => {
     const phoneClean = phone ? String(phone).trim() : null;
 
     const existingByEmail = await prisma.user.findUnique({ where: { email } });
-    if (existingByEmail)
-      return res.status(409).json({ message: "User already exists (email)" });
+    if (existingByEmail) return res.status(409).json({ message: "User already exists (email)" });
 
     if (phoneClean) {
       const existingByPhone = await prisma.user
         .findUnique({ where: { phone: phoneClean } })
         .catch(() => null);
 
-      if (existingByPhone)
-        return res.status(409).json({ message: "User already exists (phone)" });
+      if (existingByPhone) return res.status(409).json({ message: "User already exists (phone)" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -165,7 +158,6 @@ exports.register = async (req, res) => {
         phone: phoneClean,
         role: role || "TECHNICIAN",
         region,
-        specialization: specialization || null,
       },
     });
 
@@ -178,7 +170,6 @@ exports.register = async (req, res) => {
         role: newUser.role,
         region: newUser.region,
         phone: newUser.phone,
-        specialization: newUser.specialization,
       },
     });
   } catch (error) {

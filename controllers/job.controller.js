@@ -2,7 +2,7 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 const { enqueueSms } = require("../services/smsOutbox");
-
+const { sendSms } = require("../services/smsProvider");
 // helper: fetch technician phone (adjust based on your schema)
 async function getTechnicianPhone(tx, technicianId) {
   if (!technicianId) return null;
@@ -116,7 +116,15 @@ exports.createJob = async (req, res) => {
           refId: newJob.id,
         });
       }
+       console.log("✅ about to TEST-send SMS to tech:", techInfo.phone);
 
+  await sendSms(
+    techInfo.phone,
+    `TEST SMS: New job assigned ${newJob.vehicleReg} (${newJob.jobType})`
+  );
+
+  console.log("✅ sendSms() called");
+  
       return { job: newJob };
     });
 

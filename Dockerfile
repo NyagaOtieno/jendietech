@@ -1,37 +1,28 @@
-# Stage 1: Build with devDependencies
+# ---- builder ----
 FROM node:20-alpine AS builder
-
 WORKDIR /app
 
-# Install all dependencies including dev
-COPY package.json package-lock.json ./
+# Copy package files first
+COPY package*.json ./
+
+# ✅ Copy prisma schema BEFORE npm ci (so postinstall prisma generate can find it)
+COPY prisma ./prisma
+
+# Install deps (postinstall runs here)
 RUN npm ci
 
-# Copy project files
+# Copy the rest of the code
 COPY . .
 
-# Make Prisma executable
-RUN chmod +x node_modules/.bin/prisma
-
-# Generate Prisma client
+# (Optional but safe) ensure prisma client is generated
 RUN npx prisma generate
 
-# Stage 2: Production image
-FROM node:20-alpine
-
+# ---- runtime ----
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Install only production dependencies
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+# Copy built app
+COPY --from=builder /app /app
 
-# Copy built files and generated prisma client
-COPY --from=builder /app .
-
-# Set environment
-ENV NODE_ENV=production
-
-EXPOSE 3000
-
-# Start server
+EXPOSE 8080
 CMD ["node", "server.js"]

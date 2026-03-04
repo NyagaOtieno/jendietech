@@ -113,6 +113,11 @@ exports.createJob = async (req, res) => {
   toPhone: techInfo.phone,
   message: `New job assigned: ${newJob.vehicleReg} (${newJob.jobType}). Location: ${newJob.location || "N/A"}.`,
 });
+const pendingCount = await tx.smsOutbox.count({ where: { status: "PENDING" } });
+console.log("✅ Tx Outbox PENDING count now:", pendingCount);
+
+const last = await tx.smsOutbox.findFirst({ orderBy: { createdAt: "desc" } });
+console.log("✅ Tx Outbox last row:", last);
       }
    
 
@@ -221,7 +226,7 @@ exports.updateJob = async (req, res) => {
       // ✅ Send SMS ONLY when status transitions to DONE
       const becameDone = before.status !== "DONE" && updatedJob.status === "DONE";
       if (becameDone && updatedJob.clientPhone) {
-     await enqueueSms(tx, {
+await enqueueSms(tx, {
   jobId: updatedJob.id,
   toPhone: updatedJob.clientPhone,
   message: `Hi ${updatedJob.clientName || ""}, your job for ${updatedJob.vehicleReg} is DONE. Thank you.`,

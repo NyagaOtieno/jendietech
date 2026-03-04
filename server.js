@@ -12,6 +12,7 @@ const sessionRoutes = require("./routes/session.routes");
 const rollcallRoutes = require("./routes/rollcall.routes");
 const userRoutes = require("./routes/user.routes");
 const authRoutes = require("./routes/auth.routes");
+const smsRoutes = require("./routes/sms.routes");
 
 // ----------------------
 // Initialize App
@@ -54,6 +55,7 @@ app.use("/api/sessions", sessionRoutes);
 app.use("/api/rollcall", rollcallRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/sms", smsRoutes);
 
 // ----------------------
 // Health Check

@@ -38,5 +38,5 @@ async function runSmsWorkerOnce(limit = 20) {
     }
   }
 }
-
+console.log("Processing outbox row:", { id: row.id, idType: typeof row.id, toPhone: row.toPhone, status: row.status });
 module.exports = { runSmsWorkerOnce };

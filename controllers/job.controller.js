@@ -109,19 +109,12 @@ exports.createJob = async (req, res) => {
       const techInfo = await getTechnicianPhone(tx, newJob.technicianId);
       if (techInfo?.phone) {
         await enqueueSms(tx, {
-          to: techInfo.phone,
-          message: `New job assigned: ${newJob.vehicleReg} (${newJob.jobType}). Location: ${newJob.location || "N/A"}.`,
-          purpose: "JOB_CREATED_TECH",
-          refType: "Job",
-          refId: newJob.id,
-        });
+  jobId: newJob.id,
+  toPhone: techInfo.phone,
+  message: `New job assigned: ${newJob.vehicleReg} (${newJob.jobType}). Location: ${newJob.location || "N/A"}.`,
+});
       }
-       console.log("✅ about to TEST-send SMS to tech:", techInfo.phone);
-
-  await sendSms(
-    techInfo.phone,
-    `TEST SMS: New job assigned ${newJob.vehicleReg} (${newJob.jobType})`
-  );
+   
 
   console.log("✅ sendSms() called");
   
@@ -228,13 +221,11 @@ exports.updateJob = async (req, res) => {
       // ✅ Send SMS ONLY when status transitions to DONE
       const becameDone = before.status !== "DONE" && updatedJob.status === "DONE";
       if (becameDone && updatedJob.clientPhone) {
-        await enqueueSms(tx, {
-          to: updatedJob.clientPhone,
-          message: `Hi ${updatedJob.clientName || ""}, your job for ${updatedJob.vehicleReg} is DONE. Thank you.`,
-          purpose: "JOB_DONE_CLIENT",
-          refType: "Job",
-          refId: updatedJob.id,
-        });
+     await enqueueSms(tx, {
+  jobId: updatedJob.id,
+  toPhone: updatedJob.clientPhone,
+  message: `Hi ${updatedJob.clientName || ""}, your job for ${updatedJob.vehicleReg} is DONE. Thank you.`,
+});
       }
 
       return { job: updatedJob };

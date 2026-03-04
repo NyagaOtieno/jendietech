@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const { execSync } = require("child_process"); // for running Prisma commands
-
+const { runSmsWorkerOnce } = require("./workers/smsWorker");
 // ----------------------
 // Import Routes
 // ----------------------
@@ -18,6 +18,11 @@ const authRoutes = require("./routes/auth.routes");
 // ----------------------
 const app = express();
 
+setInterval(() => {
+  runSmsWorkerOnce(20).catch((e) => console.error("SmsWorker crashed:", e));
+}, 3000);
+
+console.log("✅ SmsWorker interval started");
 // ----------------------
 // Debug Hooks (Catch Hidden Errors)
 // ----------------------

@@ -1,35 +1,40 @@
+// controllers/job.controller.js
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 const { enqueueSms } = require("../services/smsOutbox");
-const { sendSms } = require("../services/smsProvider");
-// helper: fetch technician phone (adjust based on your schema)
-async function getTechnicianPhone(tx, technicianId) {
-  if (!technicianId) return null;
 
-  // Option A: Technician model
-  const tech = await tx.technician?.findUnique?.({
-    where: { id: parseInt(technicianId) },
-    select: { phone: true, name: true },
-  }).catch(() => null);
-
-  if (tech?.phone) return { phone: tech.phone, name: tech.name || "Technician" };
-
-  // Option B: User model (if technician is a user)
-  const user = await tx.user?.findUnique?.({
-    where: { id: parseInt(technicianId) },
-    select: { phone: true, name: true },
-  }).catch(() => null);
-
-  if (user?.phone) return { phone: user.phone, name: user.name || "Technician" };
-
-  return null;
+// -----------------------------
+// Helpers
+// -----------------------------
+function toInt(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
-/**
- * @desc Create job (prevent duplicates by vehicleReg)
- * @route POST /api/jobs
- */
+function parseDateOrNull(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+async function getTechnicianPhone(tx, technicianId) {
+  const id = toInt(technicianId);
+  if (!id) return null;
+
+  const user = await tx.user.findUnique({
+    where: { id },
+    select: { phone: true, name: true },
+  });
+
+  if (!user?.phone) return null;
+  return { phone: user.phone, name: user.name || "Technician" };
+}
+
+// -----------------------------
+// Create Job
+// POST /api/jobs
+// -----------------------------
 exports.createJob = async (req, res) => {
   try {
     const {
@@ -44,85 +49,72 @@ exports.createJob = async (req, res) => {
       status = "PENDING",
     } = req.body;
 
+    if (!vehicleReg || !jobType) {
+      return res.status(400).json({ message: "vehicleReg and jobType are required" });
+    }
+
+    const techId = toInt(technicianId);
+    const sched = parseDateOrNull(scheduledDate);
+
     const result = await prisma.$transaction(async (tx) => {
-      // 🔍 Check if a job exists for this vehicle
       const existingJob = await tx.job.findFirst({
         where: { vehicleReg },
         orderBy: { createdAt: "desc" },
       });
 
-      // If pending exists and request also pending -> block
+      // Block duplicate pending job
       if (existingJob && existingJob.status === "PENDING" && status === "PENDING") {
         return { blocked: true, existingJob };
       }
 
-      // If pending exists but request says something else -> update instead
+      // Update instead of duplicate (if latest is pending and caller wants other status)
       if (existingJob && existingJob.status === "PENDING" && status !== "PENDING") {
         const updatedJob = await tx.job.update({
           where: { id: existingJob.id },
           data: {
             status,
             jobType,
-            scheduledDate: scheduledDate ? new Date(scheduledDate) : existingJob.scheduledDate,
-            location,
-            technicianId: technicianId ? parseInt(technicianId) : existingJob.technicianId,
-            clientName: clientName || existingJob.clientName,
-            clientPhone: clientPhone || existingJob.clientPhone,
-            notes: notes || existingJob.notes,
+            scheduledDate: sched || existingJob.scheduledDate,
+            location: location ?? existingJob.location,
+            technicianId: techId ?? existingJob.technicianId,
+            clientName: clientName ?? existingJob.clientName,
+            clientPhone: clientPhone ?? existingJob.clientPhone,
+            notes: notes ?? existingJob.notes,
           },
         });
-
-        // ✅ If you want SMS only on NEW job creation, do nothing here.
-        // If you ALSO want to notify tech when a pending job is updated/assigned, uncomment:
-        /*
-        const techInfo = await getTechnicianPhone(tx, updatedJob.technicianId);
-        if (techInfo?.phone) {
-          await enqueueSms(tx, {
-            to: techInfo.phone,
-            message: `Job updated for ${updatedJob.vehicleReg}. Type: ${updatedJob.jobType}.`,
-            purpose: "JOB_CREATED_TECH",
-            refType: "Job",
-            refId: updatedJob.id,
-          });
-        }
-        */
 
         return { updatedInstead: true, job: updatedJob };
       }
 
-      // 🚀 Otherwise, create a new job
+      // Create new job
       const newJob = await tx.job.create({
         data: {
           vehicleReg,
           jobType,
           status,
-          scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
-          location,
-          technicianId: parseInt(technicianId),
-          clientName,
-          clientPhone,
-          notes,
+          scheduledDate: sched, // schema requires DateTime; if your schema requires non-null, validate earlier
+          location: location ?? null,
+          technicianId: techId,
+          clientName: clientName ?? null,
+          clientPhone: clientPhone ?? null,
+          notes: notes ?? null,
         },
       });
 
-      // ✅ Queue SMS to technician (JOB CREATED)
+      // Queue SMS to technician (JOB CREATED)
       const techInfo = await getTechnicianPhone(tx, newJob.technicianId);
       if (techInfo?.phone) {
         await enqueueSms(tx, {
-  jobId: newJob.id,
-  toPhone: techInfo.phone,
-  message: `New job assigned: ${newJob.vehicleReg} (${newJob.jobType}). Location: ${newJob.location || "N/A"}.`,
-});
-const pendingCount = await tx.smsOutbox.count({ where: { status: "PENDING" } });
-console.log("✅ Tx Outbox PENDING count now:", pendingCount);
-
-const last = await tx.smsOutbox.findFirst({ orderBy: { createdAt: "desc" } });
-console.log("✅ Tx Outbox last row:", last);
+          jobId: newJob.id,
+          toPhone: techInfo.phone,
+          // eventKey makes it "one SMS only" even if create is retried
+          eventKey: `JOB_CREATED_TECH_${newJob.id}`,
+          message: `New job assigned: ${newJob.vehicleReg} (${newJob.jobType}). Location: ${newJob.location || "N/A"}.`,
+        });
+      } else {
+        console.log("⚠️ Technician phone missing. technicianId:", newJob.technicianId);
       }
-   
 
-  console.log("✅ sendSms() called");
-  
       return { job: newJob };
     });
 
@@ -143,21 +135,23 @@ console.log("✅ Tx Outbox last row:", last);
     return res.status(201).json({ message: "Job created successfully", job: result.job });
   } catch (err) {
     console.error("Error creating job:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
-/**
- * @desc Start job (auto-create session with GPS)
- * @route POST /api/jobs/start/:jobId
- */
+// -----------------------------
+// Start Job
+// POST /api/jobs/start/:jobId
+// -----------------------------
 exports.startJob = async (req, res) => {
   try {
-    const { jobId } = req.params;
+    const jobId = toInt(req.params.jobId);
     const { userId, latitude, longitude } = req.body;
 
+    if (!jobId) return res.status(400).json({ message: "Invalid jobId" });
+
     const job = await prisma.job.update({
-      where: { id: parseInt(jobId) },
+      where: { id: jobId },
       data: { status: "IN_PROGRESS" },
     });
 
@@ -166,25 +160,27 @@ exports.startJob = async (req, res) => {
         userId,
         loginTime: new Date(),
         active: true,
-        latitude: latitude || null,
-        longitude: longitude || null,
+        latitude: latitude ?? null,
+        longitude: longitude ?? null,
       },
     });
 
-    res.json({ message: "Job started and session logged", job });
+    return res.json({ message: "Job started and session logged", job });
   } catch (err) {
     console.error("Error starting job:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
-/**
- * @desc Update job (complete/escalate/etc.)
- * @route PUT /api/jobs/update/:jobId
- */
+// -----------------------------
+// Update Job
+// PUT /api/jobs/update/:jobId
+// -----------------------------
 exports.updateJob = async (req, res) => {
   try {
-    const { jobId } = req.params;
+    const jobId = toInt(req.params.jobId);
+    if (!jobId) return res.status(400).json({ message: "Invalid jobId" });
+
     const {
       userId,
       status,
@@ -198,39 +194,38 @@ exports.updateJob = async (req, res) => {
     } = req.body;
 
     const result = await prisma.$transaction(async (tx) => {
-      const before = await tx.job.findUnique({
-        where: { id: parseInt(jobId) },
-      });
+      const before = await tx.job.findUnique({ where: { id: jobId } });
       if (!before) return { notFound: true };
 
       const updatedJob = await tx.job.update({
-        where: { id: parseInt(jobId) },
+        where: { id: jobId },
         data: {
-          status,
-          governorSerial,
-          governorStatus,
-          clientName,
-          clientPhone,
-          remarks,
+          ...(status ? { status } : {}),
+          governorSerial: governorSerial ?? before.governorSerial,
+          governorStatus: governorStatus ?? before.governorStatus,
+          clientName: clientName ?? before.clientName,
+          clientPhone: clientPhone ?? before.clientPhone,
+          remarks: remarks ?? before.remarks,
         },
       });
 
       await tx.session.updateMany({
         where: { userId, active: true },
         data: {
-          latitude: latitude || null,
-          longitude: longitude || null,
+          latitude: latitude ?? null,
+          longitude: longitude ?? null,
         },
       });
 
-      // ✅ Send SMS ONLY when status transitions to DONE
+      // ✅ Send customer SMS ONLY when status transitions to DONE (and only once)
       const becameDone = before.status !== "DONE" && updatedJob.status === "DONE";
       if (becameDone && updatedJob.clientPhone) {
-await enqueueSms(tx, {
-  jobId: updatedJob.id,
-  toPhone: updatedJob.clientPhone,
-  message: `Hi ${updatedJob.clientName || ""}, your job for ${updatedJob.vehicleReg} is DONE. Thank you.`,
-});
+        await enqueueSms(tx, {
+          jobId: updatedJob.id,
+          toPhone: updatedJob.clientPhone,
+          eventKey: `JOB_DONE_CLIENT_${updatedJob.id}`, // one SMS only
+          message: `Hello ${updatedJob.clientName || ""}, the job to service ${updatedJob.vehicleReg} is DONE. Thank you.`,
+        });
       }
 
       return { job: updatedJob };
@@ -240,9 +235,9 @@ await enqueueSms(tx, {
       return res.status(404).json({ message: "Job not found" });
     }
 
-    res.json({ message: "Job updated and GPS logged", job: result.job });
+    return res.json({ message: "Job updated and GPS logged", job: result.job });
   } catch (err) {
     console.error("Error updating job:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };

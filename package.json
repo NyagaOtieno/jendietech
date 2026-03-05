@@ -25,7 +25,7 @@
     "workflow"
   ],
   "author": "Kennedy",
-  "license": "MIT",
+  "license": "Jendie",
   "dependencies": {
     "@prisma/client": "^6.16.2",
     "axios": "^1.13.6",

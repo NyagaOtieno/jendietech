@@ -3,11 +3,6 @@ const prisma = new PrismaClient();
 const { sendSmsMSpace } = require("../services/sms/mspaceSms");
 const { normalizeKenyaPhone } = require("../utils/sms");
 
-/**
- * Process SMS outbox once.
- * @param {number} limit Max messages to process at a time
- * @param {boolean} verbose Log detailed info
- */
 async function runSmsWorkerOnce(limit = 20, verbose = true) {
   const now = new Date();
 
@@ -24,13 +19,18 @@ async function runSmsWorkerOnce(limit = 20, verbose = true) {
 
   for (const row of dueMessages) {
     try {
-      // Claim row safely
-      const claimed = await prisma.smsOutbox.updateMany({
-        where: { id: row.id, status: "PENDING" },
-        data: { status: "SENDING" },
+      // --- Claim the row atomically in a transaction ---
+      const claimed = await prisma.$transaction(async (tx) => {
+        const r = await tx.smsOutbox.findUnique({ where: { id: row.id } });
+        if (!r || r.status !== "PENDING") return null;
+        await tx.smsOutbox.update({
+          where: { id: row.id },
+          data: { status: "SENDING" },
+        });
+        return r;
       });
 
-      if (claimed.count === 0) continue; // already claimed by another worker
+      if (!claimed) continue; // Already handled
 
       const to = normalizeKenyaPhone(row.toPhone);
       if (!to) throw new Error(`Invalid phone number: ${row.toPhone}`);
@@ -38,28 +38,24 @@ async function runSmsWorkerOnce(limit = 20, verbose = true) {
       // Send SMS
       const resp = await sendSmsMSpace({ to, message: row.message });
 
-      // --- VERIFY DELIVERY ---
-      // Check provider response
+      // ✅ Check if provider confirms delivery
       const sentSuccessfully =
         resp?.message?.[0]?.status?.toUpperCase?.() === "OK" || resp?.success === true;
 
-      if (!sentSuccessfully) {
-        throw new Error(`Provider rejected message: ${JSON.stringify(resp)}`);
-      }
+      if (!sentSuccessfully) throw new Error(`Provider rejected message: ${JSON.stringify(resp)}`);
 
-      // Mark row as SENT only if provider confirms
+      // Mark as SENT
       await prisma.smsOutbox.update({
         where: { id: row.id },
         data: { status: "SENT", sentAt: new Date(), lastError: null },
       });
 
       if (verbose) console.log("✅ SENT", { id: String(row.id), to, resp });
-
     } catch (err) {
+      // Increment retries and schedule next attempt
       const retries = (row.retries || 0) + 1;
       const errorText = String(err?.response?.data || err?.message || err).slice(0, 2000);
 
-      // Exponential backoff: retry in 2^retries minutes
       await prisma.smsOutbox.update({
         where: { id: row.id },
         data: {
@@ -69,7 +65,7 @@ async function runSmsWorkerOnce(limit = 20, verbose = true) {
           scheduledFor:
             retries >= 5
               ? row.scheduledFor
-              : new Date(Date.now() + Math.pow(2, retries) * 60 * 1000),
+              : new Date(Date.now() + Math.pow(2, retries) * 60 * 1000), // exponential backoff
         },
       });
 

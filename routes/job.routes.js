@@ -13,6 +13,7 @@ const {
   normalizeKenyaPhone,
   buildJobDoneClientSms,
   buildFeedbackSms,
+  buildJobAssignedTechnicianSms, // new helper to notify technician
 } = require("../utils/sms");
 
 // ----------------------
@@ -96,6 +97,22 @@ router.post("/", async (req, res) => {
         updatedBy: Number(technicianId),
       },
     });
+
+    // ✅ Send SMS to technician on job assignment
+    const techPhone = normalizeKenyaPhone(job.assignedTechnician.phone);
+    if (techPhone) {
+      await queueSms({
+        jobId: job.id,
+        toPhone: techPhone,
+        message: buildJobAssignedTechnicianSms({
+          technicianName: job.assignedTechnician.name,
+          vehicleReg: job.vehicleReg,
+          jobType: job.jobType,
+          scheduledDate: job.scheduledDate,
+        }),
+        scheduledFor: new Date(),
+      });
+    }
 
     res.status(201).json({ message: "Job created successfully", data: job });
   } catch (err) {
@@ -204,7 +221,7 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
       }
     }
 
-    // ✅ MAIN UPDATE (THIS WAS MISSING ❗)
+    // ✅ MAIN UPDATE
     const updatedJob = await prisma.job.update({
       where: { id: jobId },
       data: {
@@ -225,7 +242,7 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
       },
     });
 
-    // ✅ Update session GPS (kept)
+    // ✅ Update session GPS
     if (userId) {
       await prisma.session.updateMany({
         where: { userId: Number(userId), active: true },
@@ -244,7 +261,7 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
       });
     }
 
-    // ✅ Upload photos (kept)
+    // ✅ Upload photos
     if (req.files && req.files.length > 0) {
       const photosData = req.files.map((file) => ({
         jobId,
@@ -254,7 +271,7 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
       await prisma.photo.createMany({ data: photosData });
     }
 
-    // ✅ SMS block (FIXED)
+    // ✅ SMS block for job DONE
     const oldStatus = String(jobExists.status || "").toUpperCase();
     const newStatusUpper = String(newStatus || "").toUpperCase();
 

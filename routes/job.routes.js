@@ -1,23 +1,23 @@
 const express = require("express");
 const { PrismaClient } = require("@prisma/client");
 const multer = require("multer");
-const path = require("path");
 const fs = require("fs");
 
 const prisma = new PrismaClient();
 const router = express.Router();
 
-// ✅ SMS imports (kept)
+// ✅ SMS imports (kept + improved usage)
 const { queueSms, createFeedbackToken } = require("../services/sms/smsQueue");
 const {
   normalizeKenyaPhone,
   buildJobDoneClientSms,
   buildFeedbackSms,
-  buildJobAssignedTechnicianSms, // new helper to notify technician
+  buildJobAssignedTechnicianSms,
+  buildJobDoneWithFeedbackSms, // ✅ NEW combined SMS
 } = require("../utils/sms");
 
 // ----------------------
-// Multer storage for photos
+// Multer storage
 // ----------------------
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
@@ -26,7 +26,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // ----------------------
-// CREATE JOB SAFELY (No Duplication per Day)
+// CREATE JOB
 // ----------------------
 router.post("/", async (req, res) => {
   try {
@@ -45,8 +45,7 @@ router.post("/", async (req, res) => {
 
     if (!vehicleReg || !jobType || !scheduledDate || !technicianId) {
       return res.status(400).json({
-        message:
-          "vehicleReg, jobType, scheduledDate, and technicianId are required",
+        message: "vehicleReg, jobType, scheduledDate, and technicianId are required",
       });
     }
 
@@ -64,7 +63,7 @@ router.post("/", async (req, res) => {
 
     if (existingJob) {
       return res.status(400).json({
-        message: `Job already exists for vehicle ${vehicleReg} (${jobType}) on ${
+        message: `Job already exists for ${vehicleReg} (${jobType}) on ${
           startOfDay.toISOString().split("T")[0]
         }`,
       });
@@ -89,6 +88,7 @@ router.post("/", async (req, res) => {
       include: { assignedTechnician: true },
     });
 
+    // ✅ History
     await prisma.jobHistory.create({
       data: {
         jobId: job.id,
@@ -98,17 +98,18 @@ router.post("/", async (req, res) => {
       },
     });
 
-    // ✅ Send SMS to technician on job assignment
-    const techPhone = normalizeKenyaPhone(job.assignedTechnician.phone);
+    // ✅ Technician SMS (SAFE)
+    const techPhone = normalizeKenyaPhone(job.assignedTechnician?.phone);
     if (techPhone) {
       await queueSms({
         jobId: job.id,
         toPhone: techPhone,
         message: buildJobAssignedTechnicianSms({
-          technicianName: job.assignedTechnician.name,
+          technicianName: job.assignedTechnician?.name,
           vehicleReg: job.vehicleReg,
           jobType: job.jobType,
           scheduledDate: job.scheduledDate,
+          location: job.location,
         }),
         scheduledFor: new Date(),
       });
@@ -122,7 +123,7 @@ router.post("/", async (req, res) => {
 });
 
 // ----------------------
-// GET JOBS WITH FILTERS + PAGINATION
+// GET JOBS
 // ----------------------
 router.get("/", async (req, res) => {
   try {
@@ -147,7 +148,7 @@ router.get("/", async (req, res) => {
     };
 
     Object.keys(filters).forEach(
-      (key) => filters[key] === undefined && delete filters[key]
+      (k) => filters[k] === undefined && delete filters[k]
     );
 
     const jobs = await prisma.job.findMany({
@@ -174,7 +175,7 @@ router.get("/", async (req, res) => {
 });
 
 // ----------------------
-// UPDATE EXISTING JOB + PHOTO UPLOAD
+// UPDATE JOB
 // ----------------------
 router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
   try {
@@ -195,13 +196,17 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
       scheduledDate,
     } = req.body;
 
-    const jobExists = await prisma.job.findUnique({ where: { id: jobId } });
+    const jobExists = await prisma.job.findUnique({
+      where: { id: jobId },
+      include: { assignedTechnician: true },
+    });
+
     if (!jobExists) return res.status(404).json({ message: "Job not found" });
 
     const newVehicleReg = vehicleReg || jobExists.vehicleReg;
     const newStatus = status || jobExists.status;
 
-    // ✅ DUPLICATE CHECK
+    // ✅ Duplicate check
     if (
       (vehicleReg && vehicleReg !== jobExists.vehicleReg) ||
       (status && status !== jobExists.status)
@@ -216,12 +221,16 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
 
       if (duplicate) {
         return res.status(400).json({
-          message: `Cannot update: a job with vehicle ${newVehicleReg} and status ${newStatus} already exists.`,
+          message: `Duplicate job exists for ${newVehicleReg} with status ${newStatus}`,
         });
       }
     }
 
-    // ✅ MAIN UPDATE
+    // ✅ Detect technician change
+    const technicianChanged =
+      technicianId &&
+      Number(technicianId) !== jobExists.assignedTechnician?.id;
+
     const updatedJob = await prisma.job.update({
       where: { id: jobId },
       data: {
@@ -240,9 +249,29 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
         clientPhone: clientPhone || jobExists.clientPhone,
         remarks: remarks || jobExists.remarks,
       },
+      include: { assignedTechnician: true },
     });
 
-    // ✅ Update session GPS
+    // ✅ Notify technician if changed
+    if (technicianChanged) {
+      const techPhone = normalizeKenyaPhone(updatedJob.assignedTechnician?.phone);
+      if (techPhone) {
+        await queueSms({
+          jobId,
+          toPhone: techPhone,
+          message: buildJobAssignedTechnicianSms({
+            technicianName: updatedJob.assignedTechnician?.name,
+            vehicleReg: updatedJob.vehicleReg,
+            jobType: updatedJob.jobType,
+            scheduledDate: updatedJob.scheduledDate,
+            location: updatedJob.location,
+          }),
+          scheduledFor: new Date(),
+        });
+      }
+    }
+
+    // ✅ GPS + history
     if (userId) {
       await prisma.session.updateMany({
         where: { userId: Number(userId), active: true },
@@ -261,35 +290,25 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
       });
     }
 
-    // ✅ Upload photos
-    if (req.files && req.files.length > 0) {
-      const photosData = req.files.map((file) => ({
-        jobId,
-        url: `uploads/${file.filename}`,
-        uploadedAt: new Date(),
-      }));
-      await prisma.photo.createMany({ data: photosData });
+    // ✅ Photos
+    if (req.files?.length) {
+      await prisma.photo.createMany({
+        data: req.files.map((f) => ({
+          jobId,
+          url: `uploads/${f.filename}`,
+          uploadedAt: new Date(),
+        })),
+      });
     }
 
-    // ✅ SMS block for job DONE
-    const oldStatus = String(jobExists.status || "").toUpperCase();
-    const newStatusUpper = String(newStatus || "").toUpperCase();
+    // ✅ CLIENT SMS (COMBINED)
+    const oldStatus = String(jobExists.status).toUpperCase();
+    const newStatusUpper = String(newStatus).toUpperCase();
 
     if (oldStatus !== "DONE" && newStatusUpper === "DONE") {
       const to = normalizeKenyaPhone(updatedJob.clientPhone);
 
       if (to) {
-        await queueSms({
-          jobId,
-          toPhone: to,
-          message: buildJobDoneClientSms({
-            clientName: updatedJob.clientName,
-            vehicleReg: updatedJob.vehicleReg,
-            jobType: updatedJob.jobType,
-          }),
-          scheduledFor: new Date(),
-        });
-
         const token = await createFeedbackToken(jobId);
         const base = String(process.env.APP_PUBLIC_URL || "").replace(/\/+$/, "");
         const link = `${base}/r/${token}`;
@@ -297,11 +316,13 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
         await queueSms({
           jobId,
           toPhone: to,
-          message: buildFeedbackSms({
+          message: buildJobDoneWithFeedbackSms({
             clientName: updatedJob.clientName,
+            vehicleReg: updatedJob.vehicleReg,
+            jobType: updatedJob.jobType,
             feedbackLink: link,
           }),
-          scheduledFor: new Date(Date.now() + 15 * 60 * 1000),
+          scheduledFor: new Date(),
         });
       }
     }
@@ -314,15 +335,20 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
 });
 
 // ----------------------
-// DELETE JOB + PHOTOS
+// DELETE JOB
 // ----------------------
 router.delete("/:id", async (req, res) => {
   try {
     const jobId = Number(req.params.id);
 
     const photos = await prisma.photo.findMany({ where: { jobId } });
+
     photos.forEach((photo) => {
-      if (fs.existsSync(photo.url)) fs.unlinkSync(photo.url);
+      try {
+        if (fs.existsSync(photo.url)) fs.unlinkSync(photo.url);
+      } catch (e) {
+        console.warn("⚠️ Failed to delete file:", photo.url);
+      }
     });
 
     await prisma.jobHistory.deleteMany({ where: { jobId } });

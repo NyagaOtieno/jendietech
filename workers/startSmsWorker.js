@@ -38,9 +38,9 @@ async function runSmsWorkerOnce(limit = 20, verbose = true) {
       // Send SMS
       const resp = await sendSmsMSpace({ to, message: row.message });
 
-      // ✅ Check if provider confirms delivery
-      const sentSuccessfully =
-        resp?.message?.[0]?.status?.toUpperCase?.() === "OK" || resp?.success === true;
+      // ✅ Recognize MSpace's 111 status as success
+      const status = resp?.message?.[0]?.status;
+      const sentSuccessfully = status === 111 || resp?.success === true;
 
       if (!sentSuccessfully) throw new Error(`Provider rejected message: ${JSON.stringify(resp)}`);
 
@@ -52,7 +52,6 @@ async function runSmsWorkerOnce(limit = 20, verbose = true) {
 
       if (verbose) console.log("✅ SENT", { id: String(row.id), to, resp });
     } catch (err) {
-      // Increment retries and schedule next attempt
       const retries = (row.retries || 0) + 1;
       const errorText = String(err?.response?.data || err?.message || err).slice(0, 2000);
 

@@ -1,31 +1,20 @@
+/**
+ * seed.js
+ * Safe seeding: does NOT wipe production data, only ensures admin exists.
+ */
+
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require("bcryptjs");
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🔹 Clearing all non-admin data...");
-
-  // Delete in proper order to satisfy foreign keys
-  await prisma.rollCallUser.deleteMany({});
-  await prisma.rollCall.deleteMany({});
-  await prisma.session.deleteMany({});
-  await prisma.jobHistory.deleteMany({});
-  await prisma.photo.deleteMany({});
-  await prisma.job.deleteMany({});
-
-  // Delete all users except admin
-  await prisma.user.deleteMany({
-    where: {
-      role: { not: "ADMIN" }
-    }
-  });
-
   console.log("🔹 Ensuring admin user exists...");
 
-  // Check if admin exists
+  const adminEmail = "admin@jendie.com";
+
   const adminExists = await prisma.user.findUnique({
-    where: { email: "admin@jendie.com" }
+    where: { email: adminEmail }
   });
 
   if (!adminExists) {
@@ -33,7 +22,7 @@ async function main() {
     await prisma.user.create({
       data: { 
         name: "Kennedy (Admin)", 
-        email: "admin@jendie.com", 
+        email: adminEmail, 
         phone: "+254722301062",
         role: "ADMIN", 
         region: "Nairobi", 
@@ -45,9 +34,12 @@ async function main() {
     console.log("✅ Admin already exists");
   }
 
-  console.log("✅ Database cleaned: only admin remains");
+  console.log("✅ Seed complete. No other data was touched.");
 }
 
 main()
-  .catch(e => { console.error(e); process.exit(1); })
+  .catch(e => { 
+    console.error("❌ Seed error:", e); 
+    process.exit(1); 
+  })
   .finally(async () => { await prisma.$disconnect(); });

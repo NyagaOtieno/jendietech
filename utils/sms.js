@@ -1,3 +1,7 @@
+// ----------------------
+// utils/sms.js
+// ----------------------
+
 function normalizeKenyaPhone(phone) {
   if (!phone) return null;
   const p = String(phone).replace(/\s+/g, "").replace(/[()-]/g, "");
@@ -20,8 +24,21 @@ function buildFeedbackSms({ clientName, feedbackLink }) {
   return `Hi ${name}, please rate our service: ${feedbackLink}`;
 }
 
+/**
+ * Builds SMS to notify technician of new job assignment
+ */
+function buildJobAssignedTechnicianSms({ technicianName, vehicleReg, jobType, scheduledDate }) {
+  const name = technicianName || "Technician";
+  const dateStr = new Date(scheduledDate).toLocaleString("en-KE", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+  return `Hi ${name}, you have been assigned a new job:\nVehicle: ${vehicleReg}\nType: ${jobType}\nScheduled: ${dateStr}\nPlease check your app for details.`;
+}
+
 module.exports = {
   normalizeKenyaPhone,
   buildJobDoneClientSms,
   buildFeedbackSms,
+  buildJobAssignedTechnicianSms, // ✅ export it
 };

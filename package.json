@@ -7,14 +7,14 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "build": "echo 'No frontend to build yet'",
-    "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "node prisma/seed.js",
+    "migrate:dev": "prisma migrate dev --name init",
+    "migrate:prod": "prisma migrate deploy",
     "seed": "node prisma/seed.js",
+    "cleanup-seed": "node prisma/cleanupSeed.js",
     "sms-worker": "node workers/startSmsWorker.js",
-    "postinstall": "node -e \"process.env.SKIP_PRISMA_GENERATE==='1' ? console.log('skip prisma generate') : require('child_process').execSync('npx prisma generate',{stdio:'inherit'})\"",
-    "migrate:deploy": "node node_modules/prisma/build/index.js migrate deploy"
+    "postinstall": "node -e \"process.env.SKIP_PRISMA_GENERATE==='1' ? console.log('skip prisma generate') : require('child_process').execSync('npx prisma generate',{stdio:'inherit'})\""
   },
   "keywords": [
     "express",

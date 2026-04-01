@@ -3,29 +3,24 @@ const prisma = new PrismaClient();
 const { sendSmsMSpace } = require("../services/sms/mspaceSms");
 const { normalizeKenyaPhone } = require("../utils/sms");
 
-async function runSmsWorkerOnce(limit = 20) {
+async function runSmsWorkerOnce(limit = 20, verbose = true) {
   const now = new Date();
 
-  let due = [];
-  try {
-    due = await prisma.smsOutbox.findMany({
-      where: { status: "PENDING", scheduledFor: { lte: now } },
-      orderBy: { scheduledFor: "asc" },
-      take: limit,
-    });
-  } catch (e) {
-    console.error("❌ SmsWorker: failed to fetch due messages:", e?.message || e);
-    return;
+  // Fetch pending messages due for sending
+  const dueMessages = await prisma.smsOutbox.findMany({
+    where: { status: "PENDING", scheduledFor: { lte: now } },
+    orderBy: { scheduledFor: "asc" },
+    take: limit,
+  });
+
+  if (dueMessages.length && verbose) {
+    console.log(`✅ SmsWorker picked ${dueMessages.length} message(s) at ${now.toISOString()}`);
   }
 
-  console.log(`📩 SmsWorker tick @ ${now.toISOString()} | due=${due.length}`);
-
-  for (const row of due) {
-    const rowId = String(row.id);
-
+  for (const row of dueMessages) {
     try {
-      // --- Atomic claim to prevent double-send ---
-      const claimedRow = await prisma.$transaction(async (tx) => {
+      // --- Claim the row atomically in a transaction ---
+      const claimed = await prisma.$transaction(async (tx) => {
         const r = await tx.smsOutbox.findUnique({ where: { id: row.id } });
         if (!r || r.status !== "PENDING") return null;
         await tx.smsOutbox.update({
@@ -35,43 +30,46 @@ async function runSmsWorkerOnce(limit = 20) {
         return r;
       });
 
-      if (!claimedRow) continue;
+      if (!claimed) continue; // Already handled
 
       const to = normalizeKenyaPhone(row.toPhone);
       if (!to) throw new Error(`Invalid phone number: ${row.toPhone}`);
 
+      // Send SMS
       const resp = await sendSmsMSpace({ to, message: row.message });
 
-      // Check response for actual delivery
+      // ✅ Check if provider confirms delivery
       const sentSuccessfully =
         resp?.message?.[0]?.status?.toUpperCase?.() === "OK" || resp?.success === true;
 
-      if (!sentSuccessfully) throw new Error(`Provider rejected: ${JSON.stringify(resp)}`);
+      if (!sentSuccessfully) throw new Error(`Provider rejected message: ${JSON.stringify(resp)}`);
 
-      // Mark SENT
+      // Mark as SENT
       await prisma.smsOutbox.update({
         where: { id: row.id },
         data: { status: "SENT", sentAt: new Date(), lastError: null },
       });
 
-      console.log("✅ SENT", { id: rowId, to, resp });
+      if (verbose) console.log("✅ SENT", { id: String(row.id), to, resp });
     } catch (err) {
-      const errorText = String(err?.response?.data || err?.message || err).slice(0, 2000);
+      // Increment retries and schedule next attempt
       const retries = (row.retries || 0) + 1;
-      const nextTime =
-        retries >= 3 ? row.scheduledFor : new Date(Date.now() + retries * 60 * 1000);
+      const errorText = String(err?.response?.data || err?.message || err).slice(0, 2000);
 
       await prisma.smsOutbox.update({
         where: { id: row.id },
         data: {
           retries,
           lastError: errorText,
-          status: retries >= 3 ? "FAILED" : "PENDING",
-          scheduledFor: nextTime,
+          status: retries >= 5 ? "FAILED" : "PENDING",
+          scheduledFor:
+            retries >= 5
+              ? row.scheduledFor
+              : new Date(Date.now() + Math.pow(2, retries) * 60 * 1000), // exponential backoff
         },
       });
 
-      console.error("❌ FAILED", { id: rowId, retries, errorText });
+      console.error("❌ FAILED", { id: String(row.id), retries, errorText });
     }
   }
 }

@@ -181,25 +181,49 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
     const jobExists = await prisma.job.findUnique({ where: { id: jobId } });
     if (!jobExists) return res.status(404).json({ message: "Job not found" });
 
-  // Check if updating vehicleReg or status will violate unique constraint
-if (
-  (vehicleReg && vehicleReg !== jobExists.vehicleReg) ||
-  (status && status !== jobExists.status)
-) {
-  const duplicate = await prisma.job.findFirst({
-    where: {
-      vehicleReg: vehicleReg || jobExists.vehicleReg,
-      status: status || jobExists.status,
-      NOT: { id: jobId }, // exclude current job
-    },
-  });
+    const newVehicleReg = vehicleReg || jobExists.vehicleReg;
+    const newStatus = status || jobExists.status;
 
-  if (duplicate) {
-    return res.status(400).json({
-      message: `Cannot update: a job with vehicle ${vehicleReg || jobExists.vehicleReg} and status ${status || jobExists.status} already exists.`,
+    // ✅ DUPLICATE CHECK
+    if (
+      (vehicleReg && vehicleReg !== jobExists.vehicleReg) ||
+      (status && status !== jobExists.status)
+    ) {
+      const duplicate = await prisma.job.findFirst({
+        where: {
+          vehicleReg: newVehicleReg,
+          status: newStatus,
+          NOT: { id: jobId },
+        },
+      });
+
+      if (duplicate) {
+        return res.status(400).json({
+          message: `Cannot update: a job with vehicle ${newVehicleReg} and status ${newStatus} already exists.`,
+        });
+      }
+    }
+
+    // ✅ MAIN UPDATE (THIS WAS MISSING ❗)
+    const updatedJob = await prisma.job.update({
+      where: { id: jobId },
+      data: {
+        vehicleReg: newVehicleReg,
+        jobType: jobType || jobExists.jobType,
+        scheduledDate: scheduledDate
+          ? new Date(scheduledDate)
+          : jobExists.scheduledDate,
+        assignedTechnician: technicianId
+          ? { connect: { id: Number(technicianId) } }
+          : undefined,
+        status: newStatus,
+        governorSerial: governorSerial || jobExists.governorSerial,
+        governorStatus: governorStatus || jobExists.governorStatus,
+        clientName: clientName || jobExists.clientName,
+        clientPhone: clientPhone || jobExists.clientPhone,
+        remarks: remarks || jobExists.remarks,
+      },
     });
-  }
-}
 
     // ✅ Update session GPS (kept)
     if (userId) {
@@ -211,7 +235,7 @@ if (
       await prisma.jobHistory.create({
         data: {
           jobId,
-          status: status || jobExists.status,
+          status: newStatus,
           remarks: remarks || "",
           latitude: latitude || null,
           longitude: longitude || null,
@@ -220,7 +244,7 @@ if (
       });
     }
 
-    // ✅ Upload photos if any (kept)
+    // ✅ Upload photos (kept)
     if (req.files && req.files.length > 0) {
       const photosData = req.files.map((file) => ({
         jobId,
@@ -230,17 +254,14 @@ if (
       await prisma.photo.createMany({ data: photosData });
     }
 
-    // ✅ SMS block (FIXED placement: inside route, no functions removed)
-    const newStatus = String(status || jobExists.status || "").toUpperCase();
+    // ✅ SMS block (FIXED)
     const oldStatus = String(jobExists.status || "").toUpperCase();
+    const newStatusUpper = String(newStatus || "").toUpperCase();
 
-    if (oldStatus !== "DONE" && newStatus === "DONE") {
-      const to = normalizeKenyaPhone(
-        updatedJob.clientPhone || jobExists.clientPhone
-      );
+    if (oldStatus !== "DONE" && newStatusUpper === "DONE") {
+      const to = normalizeKenyaPhone(updatedJob.clientPhone);
 
       if (to) {
-        // 1) completion SMS now
         await queueSms({
           jobId,
           toPhone: to,
@@ -252,7 +273,6 @@ if (
           scheduledFor: new Date(),
         });
 
-        // 2) feedback link SMS after 15 minutes
         const token = await createFeedbackToken(jobId);
         const base = String(process.env.APP_PUBLIC_URL || "").replace(/\/+$/, "");
         const link = `${base}/r/${token}`;
@@ -272,7 +292,7 @@ if (
     res.json({ message: "Job updated successfully", job: updatedJob });
   } catch (err) {
     console.error("❌ Error updating job:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
@@ -283,13 +303,11 @@ router.delete("/:id", async (req, res) => {
   try {
     const jobId = Number(req.params.id);
 
-    // Delete photos from filesystem
     const photos = await prisma.photo.findMany({ where: { jobId } });
     photos.forEach((photo) => {
       if (fs.existsSync(photo.url)) fs.unlinkSync(photo.url);
     });
 
-    // Delete job, history, photos
     await prisma.jobHistory.deleteMany({ where: { jobId } });
     await prisma.photo.deleteMany({ where: { jobId } });
     await prisma.job.delete({ where: { id: jobId } });

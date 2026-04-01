@@ -181,25 +181,25 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
     const jobExists = await prisma.job.findUnique({ where: { id: jobId } });
     if (!jobExists) return res.status(404).json({ message: "Job not found" });
 
-    const updatedJob = await prisma.job.update({
-      where: { id: jobId },
-      data: {
-        vehicleReg: vehicleReg || jobExists.vehicleReg,
-        jobType: jobType || jobExists.jobType,
-        scheduledDate: scheduledDate
-          ? new Date(scheduledDate)
-          : jobExists.scheduledDate,
-        assignedTechnician: technicianId
-          ? { connect: { id: Number(technicianId) } }
-          : undefined,
-        status: status || jobExists.status,
-        governorSerial: governorSerial || jobExists.governorSerial,
-        governorStatus: governorStatus || jobExists.governorStatus,
-        clientName: clientName || jobExists.clientName,
-        clientPhone: clientPhone || jobExists.clientPhone,
-        remarks: remarks || jobExists.remarks,
-      },
+  // Check if updating vehicleReg or status will violate unique constraint
+if (
+  (vehicleReg && vehicleReg !== jobExists.vehicleReg) ||
+  (status && status !== jobExists.status)
+) {
+  const duplicate = await prisma.job.findFirst({
+    where: {
+      vehicleReg: vehicleReg || jobExists.vehicleReg,
+      status: status || jobExists.status,
+      NOT: { id: jobId }, // exclude current job
+    },
+  });
+
+  if (duplicate) {
+    return res.status(400).json({
+      message: `Cannot update: a job with vehicle ${vehicleReg || jobExists.vehicleReg} and status ${status || jobExists.status} already exists.`,
     });
+  }
+}
 
     // ✅ Update session GPS (kept)
     if (userId) {

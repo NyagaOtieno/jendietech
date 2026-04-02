@@ -6,6 +6,7 @@ const fs = require("fs");
 const prisma = new PrismaClient();
 const router = express.Router();
 
+
 // ✅ SMS imports (kept + improved usage)
 const { queueSms, createFeedbackToken } = require("../services/sms/smsQueue");
 const {
@@ -361,5 +362,8 @@ router.delete("/:id", async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });
+const { createJobTracking } = require("../services/jobTracking");
+
+const trackingLink = await createJobTracking(job.id);
 
 module.exports = router;

@@ -26,9 +26,9 @@ function buildFeedbackSms({ clientName, feedbackLink }) {
 }
 
 // ✅ NEW: Combined SMS (Completion + Feedback in ONE message)
-function buildJobDoneWithFeedbackSms({ clientName, vehicleReg, jobType, feedbackLink }) {
+function buildJobDoneWithFeedbackSms({ clientName, vehicleReg, jobType, trackingLink }) {
   const name = clientName || "Customer";
-  return `Hi ${name}, your job (${jobType}) for ${vehicleReg} is completed. Thank you for choosing JENDIE.\nRate us: ${feedbackLink}`;
+  return `Dear ${name}, your speed governor ${jobType} for ${vehicleReg} has been completed. Thank you for choosing JENDIE.\nRate us: ${trackingLink}`;
 }
 
 /**
@@ -50,7 +50,7 @@ function buildJobAssignedTechnicianSms({
       })
     : "Scheduled";
 
-  return `Hi ${name}, new job assigned:\nVehicle: ${vehicleReg}\nType: ${jobType}\n${dateStr}\nLocation: ${location || "Check app"}`;
+  return `Dear ${name},you have a new job assigned as below:\nVehicle Reg: ${vehicleReg}\nJob Type: ${jobType}\nJob Date:${dateStr}\nLocation and Contact: ${location || "Check app"} login https://jendietech.vercel.app/ to proceed`;
 }
 
 module.exports = {

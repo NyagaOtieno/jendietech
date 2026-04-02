@@ -6,7 +6,6 @@ const fs = require("fs");
 const prisma = new PrismaClient();
 const router = express.Router();
 
-
 // ✅ SMS imports (kept + improved usage)
 const { queueSms, createFeedbackToken } = require("../services/sms/smsQueue");
 const {
@@ -14,8 +13,11 @@ const {
   buildJobDoneClientSms,
   buildFeedbackSms,
   buildJobAssignedTechnicianSms,
-  buildJobDoneWithFeedbackSms, // ✅ NEW combined SMS
+  buildJobDoneWithFeedbackSms,
 } = require("../utils/sms");
+
+// ✅ Tracking import (FIXED POSITION)
+const { createJobTracking } = require("../services/jobTracking");
 
 // ----------------------
 // Multer storage
@@ -89,6 +91,9 @@ router.post("/", async (req, res) => {
       include: { assignedTechnician: true },
     });
 
+    // ✅ CREATE TRACKING LINK (FIXED - NO TOP LEVEL AWAIT)
+    const trackingLink = await createJobTracking(job.id);
+
     // ✅ History
     await prisma.jobHistory.create({
       data: {
@@ -99,7 +104,7 @@ router.post("/", async (req, res) => {
       },
     });
 
-    // ✅ Technician SMS (SAFE)
+    // ✅ Technician SMS
     const techPhone = normalizeKenyaPhone(job.assignedTechnician?.phone);
     if (techPhone) {
       await queueSms({
@@ -116,7 +121,12 @@ router.post("/", async (req, res) => {
       });
     }
 
-    res.status(201).json({ message: "Job created successfully", data: job });
+    res.status(201).json({
+      message: "Job created successfully",
+      data: job,
+      trackingLink, // ✅ returned to frontend
+    });
+
   } catch (err) {
     console.error("❌ Error creating job:", err);
     res.status(500).json({ message: "Server error", error: err.message });
@@ -227,7 +237,6 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
       }
     }
 
-    // ✅ Detect technician change
     const technicianChanged =
       technicianId &&
       Number(technicianId) !== jobExists.assignedTechnician?.id;
@@ -253,7 +262,7 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
       include: { assignedTechnician: true },
     });
 
-    // ✅ Notify technician if changed
+    // ✅ Technician change SMS
     if (technicianChanged) {
       const techPhone = normalizeKenyaPhone(updatedJob.assignedTechnician?.phone);
       if (techPhone) {
@@ -270,36 +279,6 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
           scheduledFor: new Date(),
         });
       }
-    }
-
-    // ✅ GPS + history
-    if (userId) {
-      await prisma.session.updateMany({
-        where: { userId: Number(userId), active: true },
-        data: { latitude: latitude || null, longitude: longitude || null },
-      });
-
-      await prisma.jobHistory.create({
-        data: {
-          jobId,
-          status: newStatus,
-          remarks: remarks || "",
-          latitude: latitude || null,
-          longitude: longitude || null,
-          updatedBy: Number(userId),
-        },
-      });
-    }
-
-    // ✅ Photos
-    if (req.files?.length) {
-      await prisma.photo.createMany({
-        data: req.files.map((f) => ({
-          jobId,
-          url: `uploads/${f.filename}`,
-          uploadedAt: new Date(),
-        })),
-      });
     }
 
     // ✅ CLIENT SMS (COMBINED)
@@ -329,6 +308,7 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
     }
 
     res.json({ message: "Job updated successfully", job: updatedJob });
+
   } catch (err) {
     console.error("❌ Error updating job:", err);
     res.status(500).json({ message: "Server error", error: err.message });
@@ -357,13 +337,11 @@ router.delete("/:id", async (req, res) => {
     await prisma.job.delete({ where: { id: jobId } });
 
     res.json({ message: "Job and associated data deleted successfully" });
+
   } catch (err) {
     console.error("❌ Error deleting job:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });
-const { createJobTracking } = require("../services/jobTracking");
-
-const trackingLink = await createJobTracking(job.id);
 
 module.exports = router;

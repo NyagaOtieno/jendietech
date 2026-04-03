@@ -19,6 +19,13 @@ const smsRoutes = require("./routes/sms.routes");
 // ----------------------
 const app = express();
 
+app.use(
+  cors({
+    origin: ["http://localhost:8080"], // allow your dev frontend
+    credentials: true,                 // allow cookies if needed
+  })
+);
+
 setInterval(() => {
   runSmsWorkerOnce(20).catch((e) => console.error("SmsWorker crashed:", e));
 }, 3000);

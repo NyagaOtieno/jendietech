@@ -92,7 +92,13 @@ router.post("/", async (req, res) => {
     });
 
     // ✅ CREATE TRACKING LINK (FIXED - NO TOP LEVEL AWAIT)
-    const trackingLink = await createJobTracking(job.id);
+   let trackingLink = null;
+
+try {
+  trackingLink = await createJobTracking(job.id);
+} catch (err) {
+  console.error("Tracking failed:", err.message);
+}
 
     // ✅ History
     await prisma.jobHistory.create({

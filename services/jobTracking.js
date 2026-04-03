@@ -12,7 +12,7 @@ async function createJobTracking(jobId) {
     },
   });
 
-  const base = process.env.APP_PUBLIC_URL || "http://localhost:8080";
+  const base = process.env.APP_BASE_URL || "http://localhost:8080";
 
   return `${base}/track/${token}`;
 }

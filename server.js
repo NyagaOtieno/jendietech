@@ -1,8 +1,9 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-const { execSync } = require("child_process"); // for running Prisma commands
+const { execSync } = require("child_process");
 const { runSmsWorkerOnce } = require("./workers/smsWorker");
+
 // ----------------------
 // Import Routes
 // ----------------------
@@ -19,38 +20,69 @@ const smsRoutes = require("./routes/sms.routes");
 // ----------------------
 const app = express();
 
+// ----------------------
+// CORS CONFIG (FIXED 🔥)
+// ----------------------
+const allowedOrigins = [
+  "http://localhost:8080",
+  "http://127.0.0.1:8080",
+  "https://jendietech.vercel.app",
+];
+
 app.use(
   cors({
-    origin: ["http://localhost:8080"], // allow your dev frontend
-    credentials: true,                 // allow cookies if needed
+    origin: function (origin, callback) {
+      // allow Postman / mobile apps / curl (no origin)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        console.warn("❌ Blocked by CORS:", origin);
+        return callback(new Error("CORS not allowed"));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
   })
 );
 
+// ✅ IMPORTANT: handle preflight globally
+app.options("*", cors());
+
+// ----------------------
+// Middleware
+// ----------------------
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ----------------------
+// Background Worker
+// ----------------------
 setInterval(() => {
-  runSmsWorkerOnce(20).catch((e) => console.error("SmsWorker crashed:", e));
+  runSmsWorkerOnce(20).catch((e) =>
+    console.error("SmsWorker crashed:", e)
+  );
 }, 3000);
 
 console.log("✅ SmsWorker interval started");
+
 // ----------------------
-// Debug Hooks (Catch Hidden Errors)
+// Debug Hooks
 // ----------------------
 process.on("uncaughtException", (err) => {
   console.error("❌ UNCAUGHT EXCEPTION:", err.message);
   console.error(err.stack);
 });
 
-process.on("unhandledRejection", (reason, promise) => {
+process.on("unhandledRejection", (reason) => {
   console.error("❌ UNHANDLED REJECTION:", reason);
 });
 
 // ----------------------
-// Middleware
+// Static Files
 // ----------------------
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Serve uploaded photos
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ----------------------
@@ -74,7 +106,7 @@ app.get("/", (req, res) => {
 // ----------------------
 // 404 Handler
 // ----------------------
-app.use((req, res, next) => {
+app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
@@ -84,59 +116,54 @@ app.use((req, res, next) => {
 app.use((err, req, res, next) => {
   console.error("🔥 Backend Error:", err.message);
   console.error(err.stack);
+
   res.status(500).json({
     message: "Server error",
     details: err.message || err,
   });
 });
 
-
 // ----------------------
-// Run Prisma Migrations & Safe Seeding
-// ----------------------
-// ----------------------
-// Run Prisma Migrations (ONLY in production)
+// Prisma Migrations (Production)
 // ----------------------
 if (process.env.NODE_ENV === "production") {
   try {
     console.log("🔧 Running Prisma migrations...");
-   const path = require("path");
-const { execSync } = require("child_process");
 
-function prismaCli(cmd) {
-  const prismaJs = path.join(__dirname, "node_modules", "prisma", "build", "index.js");
-  execSync(`node ${prismaJs} ${cmd}`, { stdio: "inherit" });
-}
+    const prismaJs = path.join(
+      __dirname,
+      "node_modules",
+      "prisma",
+      "build",
+      "index.js"
+    );
 
-// ✅ Run migrations safely on Alpine
-try {
-  prismaCli("migrate deploy");
-  console.log("✅ Migrations applied");
-} catch (e) {
-  console.error("❌ Migration error:", e);
-  // If you want the server to still start even when migration fails, don't exit
-  // process.exit(1);
-}
+    execSync(`node ${prismaJs} migrate deploy`, {
+      stdio: "inherit",
+    });
+
+    console.log("✅ Migrations applied");
   } catch (err) {
     console.error("❌ Migration error:", err);
   }
 }
 
 // ----------------------
-// Run Seed (ONLY in development)
+// Seed (Development Only)
 // ----------------------
 if (process.env.NODE_ENV !== "production") {
   try {
-    console.log("🌱 Running seed file...");
+    console.log("🌱 Running seed...");
     execSync("node prisma/seed.js", { stdio: "inherit" });
   } catch (err) {
     console.error("❌ Seed error:", err);
   }
 }
 
-
 // ----------------------
 // Start Server
 // ----------------------
 const PORT = process.env.PORT || 9000;
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`✅ Server running on port ${PORT}`)
+);

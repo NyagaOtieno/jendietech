@@ -3,6 +3,7 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 const { enqueueSms } = require("../services/smsOutbox");
+const { createJobTracking } = require("../utils/jobTracking"); // ✅ added
 
 // -----------------------------
 // Helpers
@@ -33,7 +34,6 @@ async function getTechnicianPhone(tx, technicianId) {
 
 // -----------------------------
 // Create Job
-// POST /api/jobs
 // -----------------------------
 exports.createJob = async (req, res) => {
   try {
@@ -62,12 +62,10 @@ exports.createJob = async (req, res) => {
         orderBy: { createdAt: "desc" },
       });
 
-      // Block duplicate pending job
       if (existingJob && existingJob.status === "PENDING" && status === "PENDING") {
         return { blocked: true, existingJob };
       }
 
-      // Update instead of duplicate (if latest is pending and caller wants other status)
       if (existingJob && existingJob.status === "PENDING" && status !== "PENDING") {
         const updatedJob = await tx.job.update({
           where: { id: existingJob.id },
@@ -86,13 +84,12 @@ exports.createJob = async (req, res) => {
         return { updatedInstead: true, job: updatedJob };
       }
 
-      // Create new job
       const newJob = await tx.job.create({
         data: {
           vehicleReg,
           jobType,
           status,
-          scheduledDate: sched, // schema requires DateTime; if your schema requires non-null, validate earlier
+          scheduledDate: sched,
           location: location ?? null,
           technicianId: techId,
           clientName: clientName ?? null,
@@ -101,13 +98,12 @@ exports.createJob = async (req, res) => {
         },
       });
 
-      // Queue SMS to technician (JOB CREATED)
+      // SMS to technician
       const techInfo = await getTechnicianPhone(tx, newJob.technicianId);
       if (techInfo?.phone) {
         await enqueueSms(tx, {
           jobId: newJob.id,
           toPhone: techInfo.phone,
-          // eventKey makes it "one SMS only" even if create is retried
           eventKey: `JOB_CREATED_TECH_${newJob.id}`,
           message: `New job assigned: ${newJob.vehicleReg} (${newJob.jobType}). Location: ${newJob.location || "N/A"}.`,
         });
@@ -141,7 +137,6 @@ exports.createJob = async (req, res) => {
 
 // -----------------------------
 // Start Job
-// POST /api/jobs/start/:jobId
 // -----------------------------
 exports.startJob = async (req, res) => {
   try {
@@ -174,7 +169,6 @@ exports.startJob = async (req, res) => {
 
 // -----------------------------
 // Update Job
-// PUT /api/jobs/update/:jobId
 // -----------------------------
 exports.updateJob = async (req, res) => {
   try {
@@ -217,14 +211,21 @@ exports.updateJob = async (req, res) => {
         },
       });
 
-      // ✅ Send customer SMS ONLY when status transitions to DONE (and only once)
+      // ✅ Send SMS when job becomes DONE
       const becameDone = before.status !== "DONE" && updatedJob.status === "DONE";
+
       if (becameDone && updatedJob.clientPhone) {
+        // ✅ Generate tracking link (INSIDE transaction-safe flow)
+        const trackingUrl = await createJobTracking(updatedJob.id);
+
+        console.log("🔗 Tracking URL:", trackingUrl); // debug
+
         await enqueueSms(tx, {
           jobId: updatedJob.id,
           toPhone: updatedJob.clientPhone,
-          eventKey: `JOB_DONE_CLIENT_${updatedJob.id}`, // one SMS only
-          message: `Hello ${updatedJob.clientName || ""}, the job to service ${updatedJob.vehicleReg} is DONE. Thank you.`,
+          eventKey: `JOB_DONE_CLIENT_${updatedJob.id}`,
+          message: `Dear ${updatedJob.clientName || "Customer"}, your speed governor INSTALLATION for ${updatedJob.vehicleReg} has been completed. Thank you for choosing JENDIE.
+View job details & rate our service: ${trackingUrl}`,
         });
       }
 

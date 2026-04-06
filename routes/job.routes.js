@@ -300,16 +300,16 @@ router.put("/update/:id", upload.array("photos", 5), async (req, res) => {
         const link = `${base}/r/${token}`;
 
         await queueSms({
-          jobId,
-          toPhone: to,
-          message: buildJobDoneWithFeedbackSms({
-            clientName: updatedJob.clientName,
-            vehicleReg: updatedJob.vehicleReg,
-            jobType: updatedJob.jobType,
-            feedbackLink: link,
-          }),
-          scheduledFor: new Date(),
-        });
+  jobId,
+  toPhone: to,
+  message: buildJobDoneWithFeedbackSms({
+    clientName: updatedJob.clientName,
+    vehicleReg: updatedJob.vehicleReg,
+    jobType: updatedJob.jobType,
+    trackingLink: link,  // <-- MATCH THE PARAM NAME
+  }),
+  scheduledFor: new Date(),
+});
       }
     }
 

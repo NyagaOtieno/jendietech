@@ -28,6 +28,7 @@
   "license": "Jendie",
   "dependencies": {
     "@prisma/client": "^6.16.2",
+    "amqplib": "^1.0.3",
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.6",

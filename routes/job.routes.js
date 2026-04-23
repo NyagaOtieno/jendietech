@@ -146,7 +146,6 @@ router.get("/", async (req, res) => {
   try {
     const {
       technicianId,
-      region,
       status,
       startDate,
       endDate,
@@ -154,29 +153,39 @@ router.get("/", async (req, res) => {
       limit = 20,
     } = req.query;
 
-    const filters = {
-      technicianId: technicianId ? Number(technicianId) : undefined,
-      status: status || undefined,
-      scheduledDate:
-        startDate && endDate
-          ? { gte: new Date(startDate), lte: new Date(endDate) }
-          : undefined,
-      assignedTechnician: region ? { region } : undefined,
-    };
+    const where = {};
 
-    Object.keys(filters).forEach(
-      (k) => filters[k] === undefined && delete filters[k]
-    );
+    // ✅ FIX 1: correct Prisma relation field
+    if (technicianId) {
+      where.assignedTechnicianId = Number(technicianId);
+    }
+
+    if (status) {
+      where.status = status;
+    }
+
+    if (startDate && endDate) {
+      where.scheduledDate = {
+        gte: new Date(startDate),
+        lte: new Date(endDate),
+      };
+    }
 
     const jobs = await prisma.job.findMany({
-      where: filters,
-      include: { assignedTechnician: true, photos: true, history: true },
+      where,
+      include: {
+        assignedTechnician: true,
+        photos: true,
+        history: true,
+      },
       skip: (Number(page) - 1) * Number(limit),
       take: Number(limit),
-      orderBy: { scheduledDate: "desc" },
+      orderBy: {
+        scheduledDate: "desc",
+      },
     });
 
-    const total = await prisma.job.count({ where: filters });
+    const total = await prisma.job.count({ where });
 
     res.json({
       page: Number(page),
@@ -185,12 +194,12 @@ router.get("/", async (req, res) => {
       totalPages: Math.ceil(total / Number(limit)),
       jobs,
     });
+
   } catch (err) {
     console.error("❌ Error fetching jobs:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
-
 // ----------------------
 // UPDATE JOB
 // ----------------------

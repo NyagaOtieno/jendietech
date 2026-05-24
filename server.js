@@ -5,7 +5,7 @@ const { execSync } = require("child_process");
 const { runSmsWorkerOnce } = require("./workers/smsWorker");
 
 // ----------------------
-// Import Routes
+// Routes
 // ----------------------
 const jobRoutes = require("./routes/job.routes");
 const reportRoutes = require("./routes/report.routes");
@@ -16,40 +16,52 @@ const authRoutes = require("./routes/auth.routes");
 const smsRoutes = require("./routes/sms.routes");
 
 // ----------------------
-// Initialize App
+// App Init
 // ----------------------
 const app = express();
+app.set("trust proxy", 1);
 
 // ----------------------
-// CORS CONFIG (FIXED 🔥)
+// CORS FIX (FINAL VERSION)
 // ----------------------
 const allowedOrigins = [
-  "http://localhost:8080",
+  "http://localhost:3000",
+  "http://localhost:5173",
   "http://127.0.0.1:8080",
+
   "https://jendietech.vercel.app",
+  "https://technician-jz3w.vercel.app"
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // allow Postman / mobile apps / curl (no origin)
-      if (!origin) return callback(null, true);
+const corsOptions = {
+  origin: (origin, callback) => {
+    // allow server-to-server / postman
+    if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        console.warn("❌ Blocked by CORS:", origin);
-        return callback(new Error("CORS not allowed"));
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
 
-// ✅ IMPORTANT: handle preflight globally
-app.options("*", cors());
+    console.log("❌ CORS BLOCKED:", origin);
+    return callback(null, false); // IMPORTANT: do NOT throw error
+  },
+
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With"
+  ],
+
+  credentials: true,
+};
+
+// Apply CORS globally
+app.use(cors(corsOptions));
+
+// IMPORTANT: handle preflight correctly
+app.options("*", cors(corsOptions));
 
 // ----------------------
 // Middleware
@@ -58,32 +70,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ----------------------
-// Background Worker
-// ----------------------
-setInterval(() => {
-  runSmsWorkerOnce(20).catch((e) =>
-    console.error("SmsWorker crashed:", e)
-  );
-}, 3000);
-
-console.log("✅ SmsWorker interval started");
-
-// ----------------------
-// Debug Hooks
-// ----------------------
-process.on("uncaughtException", (err) => {
-  console.error("❌ UNCAUGHT EXCEPTION:", err.message);
-  console.error(err.stack);
-});
-
-process.on("unhandledRejection", (reason) => {
-  console.error("❌ UNHANDLED REJECTION:", reason);
-});
-
-// ----------------------
 // Static Files
 // ----------------------
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// ----------------------
+// Health Check (IMPORTANT FOR DEBUG)
+// ----------------------
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Server is healthy 🚀"
+  });
+});
 
 // ----------------------
 // API Routes
@@ -97,38 +96,44 @@ app.use("/api/auth", authRoutes);
 app.use("/api/sms", smsRoutes);
 
 // ----------------------
-// Health Check
-// ----------------------
-app.get("/", (req, res) => {
-  res.json({ message: "🚀 JENDIE Tech API is running!" });
-});
-
-// ----------------------
 // 404 Handler
 // ----------------------
 app.use((req, res) => {
-  res.status(404).json({ message: "Route not found" });
+  res.status(404).json({
+    message: "Route not found"
+  });
 });
 
 // ----------------------
 // Global Error Handler
 // ----------------------
 app.use((err, req, res, next) => {
-  console.error("🔥 Backend Error:", err.message);
-  console.error(err.stack);
+  console.error("🔥 ERROR:", err);
 
   res.status(500).json({
+    success: false,
     message: "Server error",
-    details: err.message || err,
+    details: err.message
   });
 });
 
 // ----------------------
-// Prisma Migrations (Production)
+// Background Worker
+// ----------------------
+setInterval(() => {
+  runSmsWorkerOnce(20).catch((err) => {
+    console.error("SMS Worker Error:", err);
+  });
+}, 3000);
+
+console.log("✅ SMS Worker started");
+
+// ----------------------
+// Prisma Production Migration
 // ----------------------
 if (process.env.NODE_ENV === "production") {
   try {
-    console.log("🔧 Running Prisma migrations...");
+    console.log("🔧 Running migrations...");
 
     const prismaJs = path.join(
       __dirname,
@@ -139,22 +144,24 @@ if (process.env.NODE_ENV === "production") {
     );
 
     execSync(`node ${prismaJs} migrate deploy`, {
-      stdio: "inherit",
+      stdio: "inherit"
     });
 
-    console.log("✅ Migrations applied");
+    console.log("✅ Migrations complete");
   } catch (err) {
     console.error("❌ Migration error:", err);
   }
 }
 
 // ----------------------
-// Seed (Development Only)
+// Seed (dev only)
 // ----------------------
 if (process.env.NODE_ENV !== "production") {
   try {
     console.log("🌱 Running seed...");
-    execSync("node prisma/seed.js", { stdio: "inherit" });
+    execSync("node prisma/seed.js", {
+      stdio: "inherit"
+    });
   } catch (err) {
     console.error("❌ Seed error:", err);
   }
@@ -164,6 +171,7 @@ if (process.env.NODE_ENV !== "production") {
 // Start Server
 // ----------------------
 const PORT = process.env.PORT || 9000;
-app.listen(PORT, () =>
-  console.log(`✅ Server running on port ${PORT}`)
-);
+
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
